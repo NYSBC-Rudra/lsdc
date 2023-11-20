@@ -13,6 +13,8 @@ import cv2
 import time
 import numpy as np
 import requests
+import redis
+import re
 
 logger = logging.getLogger()
 
@@ -134,3 +136,151 @@ class ServerCheckThread(QThread):
                 self.visit_dir_changed.emit()
                 break
             self.msleep(self.delay)
+
+
+
+
+#Making camera object class for future use, incase any new forms of videos are outputted.
+'''
+@variables
+    - camera
+    the camera object (either a cv2.videocapture object, a redis.connection, or a link)
+    - type
+    type of camera object (for now either "cv2", "redis", or "url")
+    - getfunction
+    the required function to get an image (should change in init)
+    - key
+    redis key incase of redis connection
+@inputs
+    - objecturl
+    url of the stream for the camera object to connect to
+    - url
+    url of the stream if uses defined with url in videostreamer
+@functions
+    - setupUrlConnection
+    makes camera object if the input is a URL
+    - setupObjectConnection
+    same but if camera_object is input not URL
+    - xGet
+    currently for redis, cv2, and a generic http jpeg image. will get the image and return a qimage object
+'''
+
+class CameraObject():
+
+    '''
+    all xGet functions return a qimage object 
+    
+    
+    '''
+    def cv2Get(self):
+        self.camera.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        # Initialize a variable to store the most recent frame
+        most_recent_frame = None
+
+        timeout = self.delay / 1000.0
+        start_time = time.time()
+        if self.camera.grab():
+            retval, frame = self.camera.retrieve()
+            if retval:
+                most_recent_frame = frame
+        self.currentFrame = most_recent_frame
+
+        if self.currentFrame is None:
+            #logger.debug('no frame read from stream URL - ensure the URL does not end with newline and that the filename is correct')
+            return
+
+        height,width=self.currentFrame.shape[:2]
+        qimage= QtGui.QImage(self.currentFrame,width,height,3*width,QtGui.QImage.Format_RGB888)
+        qimage = qimage.rgbSwapped()
+        return qimage
+
+
+
+    def redisGet(self):
+        data = self.camera.get(self.key)
+        image = Image.frombuffer("RGB", (640,512), data)
+        qimage = ImageQt.ImageQt(image)
+        return qimage
+
+    def urlGet(self):
+        file = BytesIO(urllib.request.urlopen(self.url, timeout=self.delay/1000).read())
+        img = Image.open(file)
+        qimage = ImageQt.ImageQt(img)
+        return qimage
+
+    '''
+    returns the type of the link
+    '''
+    def setupObjectConnection(self, objecturl):
+        cv2match = re.match(r'http://([\d\.]+):(\d+)/(.+)', objecturl)
+        #Splits link into http:// ip : port / key
+        self.camera = cv2.VideoCapture(cv2match.group(0))
+        self.camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.type = "cv2"
+        self.getfunction = self.cv2Get
+        self.key = cv2match.group(3)
+        self.url = cv2match.group(0)
+        if self.camera.grab():
+            retval, frame = self.camera.retrieve()
+            if retval:
+                most_recent_frame = frame
+        self.currentFrame = most_recent_frame
+        return self.type
+
+
+
+    def setupUrlConnection(self, url):
+        redismatch = re.match(r'redis://([\d\.]+):(\d+)/(.+)', url)
+        linkmatch = re.match(r'http://([\d\.]+):(\d+)/(.+)', url)
+        #Splits link into http:// ip : port / key
+
+        #could use regex to check for specific ip's of camera network/redis network etc.
+
+        if redismatch:
+            #parse url
+            ip = redismatch.group(1)
+            port = redismatch.group(2)
+            self.key = redismatch.group(3)
+            self.camera = redis.StrictRedis(host=ip, port=port, db=0)
+            self.type='redis'
+            self.getfunction = self.redisGet
+            self.url = redismatch.group(0)
+            return self.type
+        elif linkmatch:
+            self.key = url
+            self.type = 'url'
+            self.getfunction = self.urlGet
+            self.url = url
+            return self.type
+        else:
+            message = 'incorrect camera object function init. stopping!'
+            logger.error(message)
+            return
+
+
+
+ #IF inputting with both and obejct url and url it will use the url input 
+    def __init__(self, objecturl, url):
+        self.getfunction = None
+        self.camera = None
+        self.key = None
+        self.type = None
+        self.url = None
+        self.currentFrame = None
+        if objecturl != None:
+            self.setupObjectConnection(objecturl)
+
+        elif url != '':
+            self.setupUrlConnection(url)  
+
+        else:
+            message = "link for cameraobject does not start with http or redis, stopping!"
+            logger.error(message)
+            return
+
+
+        if None in [self.getfunction, self.camera, self.key, self.type, self.url]:
+            message = 'incorrect camera object function init. stopping!'
+
+            logger.error(message)
+            return
