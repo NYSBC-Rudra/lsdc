@@ -36,8 +36,8 @@ class CalculatorWindow(QtWidgets.QDialog):
 		# self.r_value_enter.setCurrentIndex(1)
 
 
-		self.r_value_enter = QLineEdit()
-		self.r_value_enter.setPlaceholderText('Set detector radius')
+		self.r_value_enter = QComboBox()
+		self.r_value_enter.addItems(['245', '300', '233'])
 		self.buttonDictionary['r']['value'] = self.r_value_enter
 		self.r_value_enter.setValidator(QDoubleValidator())
 		#setting inputs to Double only
@@ -119,7 +119,7 @@ class CalculatorWindow(QtWidgets.QDialog):
 		# r_value = convertValues[r_value]
 		# r_value = float(r_value)
 
-		r_value = self.r_value_enter.displayText()
+		r_value = self.r_value_enter.currentText()
     	# checking if value is a number string or empty string
 		if r_value == "" or r_value[0].isalpha() == True:
 			self.bottom_text.setText("formula to calculate {} requires r value".format(checked_key))
@@ -139,9 +139,10 @@ class CalculatorWindow(QtWidgets.QDialog):
 		if ((l_value == "" or l_value[0].isalpha() == True) and checked_key != 'L'):
 			self.bottom_text.setText("formula to calculate {} requires L value".format(checked_key))
 			return
-		elif float(l_value) < 140 or float(l_value) > 350:
-			self.bottom_text.setText("detector to crystal distance must be between 140 and 350mm")
-			return
+		elif l_value != '' and checked_key != 'L':
+			if float(l_value) < 140 or float(l_value) > 350:
+				self.bottom_text.setText("detector to crystal distance must be between 140 and 350mm")	
+				return
 
 
 		theta_value = self.theta_value_enter.displayText()
