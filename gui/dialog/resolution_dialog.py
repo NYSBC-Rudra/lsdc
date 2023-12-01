@@ -7,6 +7,7 @@ from qtpy.QtGui import *
 import sys
 from gui.dialog import Calculator
 import typing
+import re
 
 if typing.TYPE_CHECKING:
     from lsdcGui import ControlMain
@@ -23,23 +24,25 @@ class CalculatorWindow(QtWidgets.QDialog):
 		#making radio buttons to choose formula
 		self.buttonDictionary = {'L': {'picker' : QRadioButton('Caluclate crystal to detector distance')},
 			   'd': {'picker': QRadioButton("Calculate resolution")} , 
-			   'theta': {'picker':QRadioButton("Calculate detector 2theta")},
-			   'wavelength': {'picker':QRadioButton("Calculate wavelength")},
+			#    'theta': {'picker':QRadioButton("Calculate detector 2theta")},
+			   'wavelength': {'picker':QRadioButton("Calculate Energy")},
 			     'r':{'value':None}}
 		
 		#making lines to hold inputs 
 		# self.r_value_enter = QComboBox()
-		# self.r_value_enter.setToolTip("Detector Distance")
-		# self.r_value_enter = QLineEdit()
-		# self.r_value_enter.setPlaceholderText('Set r value (in mm)')
+		# self.r_value_enter.setToolTip("Choose your detector")
+		# detectorList = ['NYX-Beamline (200.0mm)?', 'Dectris EIGER2 X 9M (244.7mm)']
+		# self.r_value_enter.addItems(detectorList)
 		# self.buttonDictionary['r']['value'] = self.r_value_enter
 		# self.r_value_enter.setCurrentIndex(1)
-
-
 		self.r_value_enter = QComboBox()
-		self.r_value_enter.addItems(['245', '300', '233'])
+		self.r_value_enter.addItems(['122.5mm (AMX & NYX)', '164mm (FMX)'])
+		self.r_value_enter.setPlaceholderText('Set detector radius')
 		self.buttonDictionary['r']['value'] = self.r_value_enter
-		self.r_value_enter.setValidator(QDoubleValidator())
+		#self.r_value_enter.setValidator(QDoubleValidator())
+
+
+
 		#setting inputs to Double only
 
 		self.L_value_enter = QLineEdit()
@@ -52,13 +55,13 @@ class CalculatorWindow(QtWidgets.QDialog):
 		self.buttonDictionary['d']['value'] = self.d_value_enter
 		self.d_value_enter.setValidator(QDoubleValidator())
 
-		self.theta_value_enter = QLineEdit()
-		self.theta_value_enter.setPlaceholderText('Set detector theta value')
-		self.buttonDictionary['theta']['value'] = self.theta_value_enter
-		self.theta_value_enter.setValidator(QDoubleValidator())
+		#self.theta_value_enter = QLineEdit()
+		# self.theta_value_enter.setPlaceholderText('Set detector theta value')
+		# self.buttonDictionary['theta']['value'] = self.theta_value_enter
+		#self.theta_value_enter.setValidator(QDoubleValidator())
 
 		self.wave_value_enter = QLineEdit()
-		self.wave_value_enter.setPlaceholderText('Set wavelength value')
+		self.wave_value_enter.setPlaceholderText('Set energy value')
 		self.buttonDictionary['wavelength']['value'] = self.wave_value_enter
 		self.wave_value_enter.setValidator(QDoubleValidator())
 
@@ -111,13 +114,6 @@ class CalculatorWindow(QtWidgets.QDialog):
 			self.bottom_text.setText("No calculation specified (press one of the radio buttons)")
 			return
 		
-		#getting values from textboxes r_value text box
-		# r_value = self.r_value_enter.currentIndex()
-		# convertValues = [200,244.7]
-		# # print("r value = {}".format(r_value))
-		# #checking if value is a number string or empty string
-		# r_value = convertValues[r_value]
-		# r_value = float(r_value)
 
 		r_value = self.r_value_enter.currentText()
     	# checking if value is a number string or empty string
@@ -125,7 +121,18 @@ class CalculatorWindow(QtWidgets.QDialog):
 			self.bottom_text.setText("formula to calculate {} requires r value".format(checked_key))
 			return
 
-		r_value = float(r_value)
+
+		r_value = convertDetectorRadius(r_value)
+
+
+
+		#getting values from textboxes r_value text box
+# 		r_value = self.r_value_enter.currentIndex()
+# 		convertValues = [200,244.7]
+# 		# print("r value = {}".format(r_value))
+# 		#checking if value is a number string or empty string
+# 		r_value = convertValues[r_value]
+# 		r_value = float(r_value)
 
 
 
@@ -145,14 +152,16 @@ class CalculatorWindow(QtWidgets.QDialog):
 				return
 
 
-		theta_value = self.theta_value_enter.displayText()
-		if ((theta_value == "" or theta_value[0].isalpha() == True)and checked_key != 'theta'):
-			self.bottom_text.setText("formula to calculate {} requires theta value".format(checked_key))
-			return
+
+
+		# theta_value = self.theta_value_enter.displayText()
+		#if ((theta_value == "" or theta_value[0].isalpha() == True)and checked_key != 'theta'):
+			# self.bottom_text.setText("formula to calculate {} requires theta value".format(checked_key))
+		#	return
 
 		wave_value = self.wave_value_enter.displayText()
 		if ((wave_value == "" or wave_value[0].isalpha() == True) and checked_key != 'wavelength'):
-			self.bottom_text.setText("formula to calculate {} requires the wavelenght".format(checked_key))
+			self.bottom_text.setText("formula to calculate {} requires the wavelength".format(checked_key))
 			return
 
 
@@ -161,20 +170,23 @@ class CalculatorWindow(QtWidgets.QDialog):
 
 		if checked_key == 'd':
 			l_value = float(self.L_value_enter.displayText())
-			theta_value = float(self.theta_value_enter.displayText())
+			# theta_value = float(self.theta_value_enter.displayText())
 			wave_value = float(self.wave_value_enter.displayText())
 
 
 
 
 
-			variableDict = {'L':l_value, 'theta': theta_value, 'wavelength': wave_value, 'r': r_value}
+			variableDict = {'L':l_value, 
+				   #'theta': theta_value, 
+				   'wavelength': wave_value, 'r': r_value}
 
 			self.calculator.set_all_variables(variableDict)
 			d_value = self.calculator.calcD()
 			value_to_return = d_value
 			self.d_value_enter.setText(str(d_value))
 			self.calculator.set_variables('d', d_value)
+			checked_key = 'Resolution'
 
 
 
@@ -182,49 +194,56 @@ class CalculatorWindow(QtWidgets.QDialog):
 		elif checked_key == 'L':
 
 			d_value = float(self.d_value_enter.displayText())
-			theta_value = float(self.theta_value_enter.displayText())
+			# theta_value = float(self.theta_value_enter.displayText())
 			wave_value = float(self.wave_value_enter.displayText())
 
 
 
 
-			variableDict = {'d':d_value, 'theta': theta_value, 'wavelength': wave_value, 'r': r_value}
+			variableDict = {'d':d_value, 
+				   #'theta': theta_value, 
+				   'wavelength': wave_value, 'r': r_value}
 
 			self.calculator.set_all_variables(variableDict)
 			L_value = self.calculator.calcL()
 			value_to_return = L_value
 			self.L_value_enter.setText(str(L_value))
 			self.calculator.set_variables('L', L_value)
+			#setting checked key name so that it will change the bottom text
+			checked_key = 'Detector distance (mm)'
 
-		elif checked_key == 'theta':
+		# elif checked_key == 'theta':
 
-			l_value = float(self.L_value_enter.displayText())
-			d_value = float(self.d_value_enter.displayText())
-			wave_value = float(self.wave_value_enter.displayText())
+		# 	l_value = float(self.L_value_enter.displayText())
+		# 	d_value = float(self.d_value_enter.displayText())
+		# 	wave_value = float(self.wave_value_enter.displayText())
 
 
-			variableDict = {'L':l_value, 'd': d_value, 'wavelength': wave_value, 'r': r_value}
+		# 	variableDict = {'L':l_value, 'd': d_value, 'wavelength': wave_value, 'r': r_value}
 
-			self.calculator.set_all_variables(variableDict)
-			theta_value = self.calculator.calcTheta()
-			value_to_return = theta_value
-			self.theta_value_enter.setText(str(theta_value))
-			self.calculator.set_variables('theta', theta_value)
+		# 	self.calculator.set_all_variables(variableDict)
+		# 	# theta_value = self.calculator.calcTheta()
+		# 	value_to_return = theta_value
+		# 	# self.theta_value_enter.setText(str(theta_value))
+		# 	# self.calculator.set_variables('theta', theta_value)
 			
 
 
 		elif checked_key == 'wavelength':
 
 			l_value = float(self.L_value_enter.displayText())
-			theta_value = float(self.theta_value_enter.displayText())
+			# theta_value = float(self.theta_value_enter.displayText())
 			d_value = float(self.d_value_enter.displayText())
-			variableDict = {'L':l_value, 'd': d_value, 'theta': theta_value, 'r': r_value}
+			variableDict = {'L':l_value, 'd': d_value, 
+				   #'theta': theta_value, 
+				   'r': r_value}
 
 			self.calculator.set_all_variables(variableDict)
 			wave_value = self.calculator.calcWavelength()
 			self.calculator.set_variables('wavelength', wave_value)
 			value_to_return = wave_value
 			self.wave_value_enter.setText(str(wave_value))
+			checked_key = 'Energy'
 		
 
 		
@@ -237,6 +256,11 @@ class CalculatorWindow(QtWidgets.QDialog):
 		return value_to_return
 
 		
+def convertDetectorRadius(inputText):
+	number = inputText[:inputText.find('mm')]
+	return float(number)
+
+
 
 
 
