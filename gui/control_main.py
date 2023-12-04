@@ -1,5 +1,6 @@
 import _thread
 import functools
+import json
 import logging
 import math
 import os
@@ -29,12 +30,13 @@ import lsdcOlog
 from config_params import (
     CRYOSTREAM_ONLINE,
     HUTCH_TIMER_DELAY,
-    SERVER_CHECK_DELAY,
     RASTER_GUI_XREC_FILL_DELAY,
     SAMPLE_TIMER_DELAY,
+    SERVER_CHECK_DELAY,
     VALID_DET_DIST,
     VALID_EXP_TIMES,
     VALID_TOTAL_EXP_TIMES,
+    VALID_TRANSMISSION,
     RasterStatus,
     cryostreamTempPV,
 )
@@ -53,13 +55,9 @@ from gui.dialog import (
 )
 from gui.raster import RasterCell, RasterGroup
 from QPeriodicTable import QPeriodicTable
-from threads import RaddoseThread, VideoThread, ServerCheckThread
+from threads import RaddoseThread, ServerCheckThread, VideoThread
 
 logger = logging.getLogger()
-try:
-    import ispybLib
-except Exception as e:
-    logger.error("lsdcGui: ISPYB import error, %s" % e)
 
 
 def get_request_object_escan(
@@ -200,8 +198,16 @@ class ControlMain(QtWidgets.QMainWindow):
         self.beamSize_pv = PV(daq_utils.beamlineComm + "size_mode")
         self.energy_pv = PV(daq_utils.motor_dict["energy"] + ".RBV")
         self.rasterStepDefs = {"Coarse": 20.0, "Fine": 10.0, "VFine": 5.0}
-        self.createSampleTab()
 
+        # Timer that waits for a second before calling raddose 3d
+        # This is to prevent multiple calls when transmission textbox is changing
+        self.raddoseTimer = QTimer()
+        self.raddoseTimer.setSingleShot(True)
+        self.raddoseTimer.setInterval(1000)
+        self.raddoseTimer.timeout.connect(self.spawnRaddoseThread)
+
+        self.createSampleTab()
+        self.userScreenDialog = UserScreenDialog(self)
         self.initCallbacks()
         if self.scannerType != "PI":
             self.motPos = {
@@ -224,14 +230,13 @@ class ControlMain(QtWidgets.QMainWindow):
         if daq_utils.beamline == "nyx":  # requires staffScreenDialog to be present
             self.staffScreenDialog.fastDPCheckBox.setDisabled(True)
 
-        self.dewarTree.refreshTreeDewarView()
         if self.mountedPin_pv.get() == "":
             mountedPin = db_lib.beamlineInfo(daq_utils.beamline, "mountedSample")[
                 "sampleID"
             ]
             self.mountedPin_pv.put(mountedPin)
         self.rasterExploreDialog = RasterExploreDialog()
-        self.userScreenDialog = UserScreenDialog(self)
+
         self.detDistMotorEntry.getEntry().setText(
             self.detDistRBVLabel.getEntry().text()
         )  # this is to fix the current val being overwritten by reso
@@ -241,6 +246,7 @@ class ControlMain(QtWidgets.QMainWindow):
                 self.changeControlMasterCB(1)
                 self.controlMasterCheckBox.setChecked(True)
         self.XRFInfoDict = self.parseXRFTable()  # I don't like this
+        # self.dewarTree.refreshTreeDewarView()
 
     def setGuiValues(self, values):
         for item, value in values.items():
@@ -519,7 +525,13 @@ class ControlMain(QtWidgets.QMainWindow):
         transmisionSPLabel = QtWidgets.QLabel("SetPoint:")
 
         self.transmission_ledit = self.transmissionSetPoint.getEntry()
-        self.transmission_ledit.setValidator(QtGui.QDoubleValidator(0.001, 0.999, 3))
+        self.transmission_ledit.setValidator(
+            QtGui.QDoubleValidator(
+                VALID_TRANSMISSION[daq_utils.beamline]["min"],
+                VALID_TRANSMISSION[daq_utils.beamline]["max"],
+                VALID_TRANSMISSION[daq_utils.beamline]["digits"],
+            )
+        )
         self.setGuiValues({"transmission": getBlConfig("stdTrans")})
         self.transmission_ledit.returnPressed.connect(self.setTransCB)
         if daq_utils.beamline == "fmx":
@@ -1201,9 +1213,11 @@ class ControlMain(QtWidgets.QMainWindow):
         sampleBrighterButton = QtWidgets.QPushButton("+")
         sampleBrighterButton.setFixedWidth(30)
         sampleBrighterButton.clicked.connect(self.lightUpCB)
+        sampleBrighterButton.setEnabled(False)  # Disabling until PV is fixed
         sampleDimmerButton = QtWidgets.QPushButton("-")
         sampleDimmerButton.setFixedWidth(30)
         sampleDimmerButton.clicked.connect(self.lightDimCB)
+        sampleDimmerButton.setEnabled(False)  # Disabling until PV is fixed
         focusLabel = QtWidgets.QLabel("Focus")
         focusLabel.setAlignment(QtCore.Qt.AlignRight | Qt.AlignVCenter)
         focusPlusButton = QtWidgets.QPushButton("+")
@@ -1527,8 +1541,7 @@ class ControlMain(QtWidgets.QMainWindow):
             lambda frame: self.updateCam(self.pixmap_item_HutchTop, frame)
         )
         self.hutchTopCamThread.start()
-        serverCheckThread = ServerCheckThread(
-            parent=self, delay=SERVER_CHECK_DELAY)
+        serverCheckThread = ServerCheckThread(parent=self, delay=SERVER_CHECK_DELAY)
         serverCheckThread.visit_dir_changed.connect(QApplication.instance().quit)
         serverCheckThread.start()
 
@@ -1545,9 +1558,7 @@ class ControlMain(QtWidgets.QMainWindow):
         try:
             ftime = float(self.annealTime_ledit.text())
             if ftime >= 0.1 and ftime <= 5.0:
-                comm_s = "anneal(" + str(ftime) + ")"
-                logger.info(comm_s)
-                self.send_to_server(comm_s)
+                self.send_to_server("anneal", [ftime])
             else:
                 self.popupServerMessage(
                     "Anneal time must be between 0.1 and 5.0 seconds."
@@ -1830,18 +1841,12 @@ class ControlMain(QtWidgets.QMainWindow):
         if rasterHeatJpeg == None:
             if reqID != None:
                 filePrefix = db_lib.getRequestByID(reqID)["request_obj"]["file_prefix"]
-                imagePath = (
-                    f"{getBlConfig('visitDirectory')}/snapshots/{filePrefix}{int(now)}.jpg"
-                )
+                imagePath = f"{getBlConfig('visitDirectory')}/snapshots/{filePrefix}{int(now)}.jpg"
             else:
                 if self.dataPathGB.prefix_ledit.text() != "":
-                    imagePath = (
-                        f"{getBlConfig('visitDirectory')}/snapshots/{self.dataPathGB.prefix_ledit.text()}{int(now)}.jpg"
-                    )
+                    imagePath = f"{getBlConfig('visitDirectory')}/snapshots/{self.dataPathGB.prefix_ledit.text()}{int(now)}.jpg"
                 else:
-                    imagePath = (
-                        f"{getBlConfig('visitDirectory')}/snapshots/capture{int(now)}.jpg"
-                    )
+                    imagePath = f"{getBlConfig('visitDirectory')}/snapshots/capture{int(now)}.jpg"
         else:
             imagePath = rasterHeatJpeg
         logger.info("saving " + imagePath)
@@ -2630,13 +2635,7 @@ class ControlMain(QtWidgets.QMainWindow):
             pass
 
     def beamsizeComboActivatedCB(self, text):
-        if daq_utils.beamline == "nyx":
-            index = self.beamsizeComboBox.findText(str(text))
-            self.aperture.current_index.put(index)
-        else:
-            comm_s = 'set_beamsize("' + str(text[0:2]) + '","' + str(text[2:4]) + '")'
-            logger.info(comm_s)
-            self.send_to_server(comm_s)
+        self.send_to_server("set_beamsize", [text[0:2], text[2:4]])
 
     def protoComboActivatedCB(self, text):
         self.showProtParams()
@@ -2682,6 +2681,8 @@ class ControlMain(QtWidgets.QMainWindow):
             )
             self.osc_start_ledit.setEnabled(True)
             self.osc_end_ledit.setEnabled(True)
+            if daq_utils.beamline == "fmx":
+                self.calcLifetimeCB()
         elif protocol == "burn":
             self.setGuiValues(
                 {
@@ -2706,6 +2707,8 @@ class ControlMain(QtWidgets.QMainWindow):
             self.osc_start_ledit.setEnabled(True)
             self.osc_end_ledit.setEnabled(True)
             self.protoVectorRadio.setChecked(True)
+            if daq_utils.beamline == "fmx":
+                self.calcLifetimeCB()
         else:
             self.protoOtherRadio.setChecked(True)
         self.totalExpChanged("")
@@ -2737,10 +2740,7 @@ class ControlMain(QtWidgets.QMainWindow):
         )
         #self.timerSample.start(SAMPLE_TIMER_DELAY)
         if fname != "":
-            logger.info(fname)
-            comm_s = f'importSpreadsheet("{fname[0]}", "{daq_utils.owner}")'
-            logger.info(comm_s)
-            self.send_to_server(comm_s)
+            self.send_to_server("importSpreadsheet", [fname[0], daq_utils.owner])
 
     def setUserModeCB(self):
         self.vidActionDefineCenterRadio.setEnabled(False)
@@ -2823,13 +2823,10 @@ class ControlMain(QtWidgets.QMainWindow):
             self.dewarTree.refreshTreePriorityView()
 
     def moveOmegaCB(self):
-        comm_s = (
-            'omegaMoveAbs('
-            + str(self.sampleOmegaMoveLedit.getEntry().text())
-            + ")"
+        self.send_to_server(
+            "mvaDescriptor",
+            ["omega", float(self.sampleOmegaMoveLedit.getEntry().text())],
         )
-        logger.info(comm_s)
-        self.send_to_server(comm_s)
 
     def moveEnergyCB(self):
         energyRequest = float(str(self.energy_ledit.text()))
@@ -2837,9 +2834,7 @@ class ControlMain(QtWidgets.QMainWindow):
             self.popupServerMessage("Energy change must be less than 10 ev")
             return
         else:
-            comm_s = 'mvaDescriptor("energy",' + str(self.energy_ledit.text()) + ")"
-            logger.info(comm_s)
-            self.send_to_server(comm_s)
+            self.send_to_server("mvaDescriptor", ["energy", float(self.energy_ledit.text())])
 
     def setLifetimeCB(self, lifetime):
         if hasattr(self, "sampleLifetimeReadback_ledit"):
@@ -2847,10 +2842,14 @@ class ControlMain(QtWidgets.QMainWindow):
             self.sampleLifetimeReadback_ledit.setStyleSheet("color : black")
 
     def calcLifetimeCB(self):
+        self.raddoseTimer.start()
+        if hasattr(self, "sampleLifetimeReadback_ledit"):
+            self.sampleLifetimeReadback_ledit.setStyleSheet("color : gray")
+
+    def spawnRaddoseThread(self):
         if not os.path.exists("2vb1.pdb"):
             os.system("cp -a $CONFIGDIR/2vb1.pdb .")
             os.system("mkdir rd3d")
-
         energyReadback = self.energy_pv.get() / 1000.0
         sampleFlux = self.sampleFluxPV.get()
         if hasattr(self, "transmission_ledit") and hasattr(
@@ -2863,16 +2862,16 @@ class ControlMain(QtWidgets.QMainWindow):
             except Exception as e:
                 logger.info(f"Exception while calculating sample flux {e}")
         logger.info("sample flux = " + str(sampleFlux))
+        # Read vector length only if the vector protocol is chosen
+        vecLen = 0
+        if self.protoVectorRadio.isChecked():
+            try:
+                vecLen = float(self.vecLenLabelOutput.text())
+            except:
+                pass
+
         try:
-            vecLen_s = self.vecLenLabelOutput.text()
-            if vecLen_s != "---":
-                vecLen = float(vecLen_s)
-            else:
-                vecLen = 0
-        except:
-            vecLen = 0
-        wedge = float(self.osc_end_ledit.text())
-        try:
+            wedge = float(self.osc_end_ledit.text())
             raddose_thread = RaddoseThread(
                 parent=self,
                 beamsizeV=3.0,
@@ -2902,22 +2901,18 @@ class ControlMain(QtWidgets.QMainWindow):
         except ValueError as e:
             self.popupServerMessage("Please enter a valid number")
             return
-        comm_s = "setTrans(" + str(self.transmission_ledit.text()) + ")"
-        logger.info(comm_s)
-        self.send_to_server(comm_s)
+        self.send_to_server("setTrans", [float(self.transmission_ledit.text())])
 
     def setDCStartCB(self):
         currentPos = float(self.sampleOmegaRBVLedit.getEntry().text()) % 360.0
         self.setGuiValues({"osc_start": currentPos})
 
     def moveDetDistCB(self):
-        comm_s = (
-            'mvaDescriptor("detectorDist",'
-            + str(self.detDistMotorEntry.getEntry().text())
-            + ")"
-        )
-        logger.info(comm_s)
-        self.send_to_server(comm_s)
+        self.send_to_server("mvaDescriptor",
+            [
+                "detectorDist",
+                float(self.detDistMotorEntry.getEntry().text()),
+            ])
 
     def omegaTweakNegCB(self):
         tv = float(self.omegaTweakVal_ledit.text())
@@ -2973,17 +2968,14 @@ class ControlMain(QtWidgets.QMainWindow):
             self.popupServerMessage("You don't have control")
 
     def autoCenterLoopCB(self):
-        logger.info("auto center loop")
-        self.send_to_server("loop_center_xrec()")
+        self.send_to_server("loop_center_xrec")
 
     def autoRasterLoopCB(self):
         self.selectedSampleID = self.selectedSampleRequest["sample"]
-        comm_s = "autoRasterLoop(" + str(self.selectedSampleID) + ")"
-        self.send_to_server(comm_s)
+        self.send_to_server("autoRasterLoop", [self.selectedSampleID])
 
     def runRastersCB(self):
-        comm_s = "snakeRaster(" + str(self.selectedSampleRequest["uid"]) + ")"
-        self.send_to_server(comm_s)
+        self.send_to_server("snakeRaster", [self.selectedSampleRequest["uid"]])
 
     def drawInteractiveRasterCB(self):  # any polygon for now, interactive or from xrec
         for i in range(len(self.polyPointItems)):
@@ -3059,10 +3051,7 @@ class ControlMain(QtWidgets.QMainWindow):
         logger.info("3-click center loop")
         self.threeClickCount = 1
         self.click3Button.setStyleSheet("background-color: yellow")
-        if(daq_utils.exporter_enabled):
-            self.md2.exporter.cmd("startManualSampleCentring", "")
-        else:
-            self.send_to_server('mvaDescriptor("omega",0)')
+        self.send_to_server("mvaDescriptor", ["omega", 0])
 
     def fillPolyRaster(
         self, rasterReq, waitTime=1
@@ -3239,10 +3228,7 @@ class ControlMain(QtWidgets.QMainWindow):
             reqID=rasterReq["uid"],
             rasterHeatJpeg=jpegImageFilename,
         )
-        try:
-            ispybLib.insertRasterResult(rasterReq, visitName)
-        except Exception as e:
-            logger.error(f"Exception while writing raster result: {e}")
+        self.send_to_server("ispybLib.insertRasterResult", [str(rasterReq["uid"]), str(visitName)])
 
     def reFillPolyRaster(self):
         rasterEvalOption = str(self.rasterEvalComboBox.currentText())
@@ -3341,10 +3327,10 @@ class ControlMain(QtWidgets.QMainWindow):
             self.centeringMarksList[i]["graphicsItem"].setSelected(True)
 
     def lightUpCB(self):
-        self.send_to_server("backlightBrighter()")
+        self.send_to_server("backlightBrighter")
 
     def lightDimCB(self):
-        self.send_to_server("backlightDimmer()")
+        self.send_to_server("backlightDimmer")
 
     def eraseRastersCB(self):
         if self.rasterList != []:
@@ -3749,38 +3735,21 @@ class ControlMain(QtWidgets.QMainWindow):
                 True
             )  # because it's easy to forget defineCenter is on
             if self.zoom4Radio.isChecked():
-                comm_s = (
-                    "changeImageCenterHighMag("
-                    + str(x_click)
-                    + ","
-                    + str(y_click)
-                    + ",1)"
+                self.send_to_server(
+                    "changeImageCenterHighMag", [x_click, y_click, 1]
                 )
             elif self.zoom3Radio.isChecked():
-                comm_s = (
-                    "changeImageCenterHighMag("
-                    + str(x_click)
-                    + ","
-                    + str(y_click)
-                    + ",0)"
+                self.send_to_server(
+                    "changeImageCenterHighMag", [x_click, y_click, 0]
                 )
             if self.zoom2Radio.isChecked():
-                comm_s = (
-                    "changeImageCenterLowMag("
-                    + str(x_click)
-                    + ","
-                    + str(y_click)
-                    + ",1)"
+                self.send_to_server(
+                    "changeImageCenterLowMag", [x_click, y_click, 1]
                 )
             elif self.zoom1Radio.isChecked():
-                comm_s = (
-                    "changeImageCenterLowMag("
-                    + str(x_click)
-                    + ","
-                    + str(y_click)
-                    + ",0)"
+                self.send_to_server(
+                    "changeImageCenterLowMag", [x_click, y_click, 0]
                 )
-            self.send_to_server(comm_s)
             return
         if self.vidActionRasterDefRadio.isChecked():
             self.click_positions.append(event.pos())
@@ -3808,28 +3777,29 @@ class ControlMain(QtWidgets.QMainWindow):
 
         if self.threeClickCount > 0:  # 3-click centering
             self.threeClickCount = self.threeClickCount + 1
-            if daq_utils.exporter_enabled: 
-                correctedC2C_x = x_click + ((daq_utils.screenPixX/2) - (self.centerMarker.x() + self.centerMarkerCharOffsetX))
-                correctedC2C_y = y_click + ((daq_utils.screenPixY/2) - (self.centerMarker.y() + self.centerMarkerCharOffsetY))
-                lsdc_x = daq_utils.screenPixX
-                lsdc_y = daq_utils.screenPixY
-                md2_x = self.md2.center_pixel_x.get() * 2
-                md2_y = self.md2.center_pixel_y.get() * 2
-                scale_x = md2_x / lsdc_x
-                scale_y = md2_y / lsdc_y
-                correctedC2C_x = correctedC2C_x * scale_x
-                correctedC2C_y = correctedC2C_y * scale_y
-                self.md2.centring_click.put(f"{correctedC2C_x} {correctedC2C_y}")
-                if self.threeClickCount == 4:
-                    self.threeClickCount = 0
-                    self.click3Button.setStyleSheet("background-color: None")
-                return
-            else:
-                comm_s = f'center_on_click({correctedC2C_x},{correctedC2C_y},{fov["x"]},{fov["y"]},source="screen",jog=90,viewangle={current_viewangle})'
+            comm_s = (
+                "center_on_click",
+                [
+                    correctedC2C_x,
+                    correctedC2C_y,
+                    fov["x"],
+                    fov["y"],
+                    {"source": "screen", "jog": 90, "viewangle": current_viewangle},
+                ],
+            )
         else:
-            comm_s = f'center_on_click({correctedC2C_x},{correctedC2C_y},{fov["x"]},{fov["y"]},source="screen",maglevel=0,viewangle={current_viewangle})'
+            comm_s = (
+                "center_on_click",
+                [
+                    correctedC2C_x,
+                    correctedC2C_y,
+                    fov["x"],
+                    fov["y"],
+                    {"source": "screen", "maglevel": 0, "viewangle": current_viewangle},
+                ],
+            )
         if not self.vidActionRasterExploreRadio.isChecked():
-            self.aux_send_to_server(comm_s)
+            self.aux_send_to_server(*comm_s)
         if self.threeClickCount == 4:
             self.threeClickCount = 0
             self.click3Button.setStyleSheet("background-color: None")
@@ -3872,7 +3842,7 @@ class ControlMain(QtWidgets.QMainWindow):
                 singleRequest == 1
             ):  # a touch kludgy, but I want to be able to edit parameters for multiple requests w/o screwing the data loc info
                 reqObj["file_prefix"] = str(self.dataPathGB.prefix_ledit.text())
-                reqObj["basePath"] = str(self.dataPathGB.base_path_ledit.text())
+                reqObj["basePath"] = getBlConfig("visitDirectory")
                 reqObj["directory"] = str(self.dataPathGB.dataPath_ledit.text())
                 reqObj["file_number_start"] = int(
                     self.dataPathGB.file_numstart_ledit.text()
@@ -3933,8 +3903,9 @@ class ControlMain(QtWidgets.QMainWindow):
                 elif itemDataType == "request":
                     selectedSampleRequest = db_lib.getRequestByID(item.data(32))
                     self.selectedSampleID = selectedSampleRequest["sample"]
-                
-                if self.selectedSampleID in samplesConsidered: # If a request is already added to the sample, move on
+
+                # If a request is already added to the sample, move on
+                if self.selectedSampleID in samplesConsidered:
                     continue
 
                 try:
@@ -4129,9 +4100,9 @@ class ControlMain(QtWidgets.QMainWindow):
                         reqObj["file_prefix"] = str(
                             self.dataPathGB.prefix_ledit.text() + "_C" + str(i + 1)
                         )
-                        reqObj["basePath"] = str(self.dataPathGB.base_path_ledit.text())
+                        reqObj["basePath"] = getBlConfig("visitDirectory")
                         reqObj["directory"] = (
-                            str(self.dataPathGB.base_path_ledit.text())
+                            getBlConfig("visitDirectory")
                             + "/"
                             + str(daq_utils.getVisitName())
                             + "/"
@@ -4255,7 +4226,7 @@ class ControlMain(QtWidgets.QMainWindow):
                     )
                 reqObj["resolution"] = float(self.resolution_ledit.text())
                 reqObj["directory"] = (
-                    str(self.dataPathGB.base_path_ledit.text())
+                    getBlConfig("visitDirectory")
                     + "/"
                     + str(daq_utils.getVisitName())
                     + "/"
@@ -4268,7 +4239,7 @@ class ControlMain(QtWidgets.QMainWindow):
                     + str(samplePositionInContainer + 1)
                     + "/"
                 )
-                reqObj["basePath"] = str(self.dataPathGB.base_path_ledit.text())
+                reqObj["basePath"] = getBlConfig("visitDirectory")
                 reqObj["file_prefix"] = str(self.dataPathGB.prefix_ledit.text())
                 reqObj["file_number_start"] = int(
                     self.dataPathGB.file_numstart_ledit.text()
@@ -4387,19 +4358,24 @@ class ControlMain(QtWidgets.QMainWindow):
         if currentRequest == {}:
             self.addRequestsToAllSelectedCB()
         logger.info("running queue")
-        self.send_to_server("runDCQueue()")
+        self.send_to_server("runDCQueue")
+        
 
     def warmupGripperCB(self):
-        self.send_to_server("warmupGripper()")
+        self.send_to_server("warmupGripper")
+        
 
     def dryGripperCB(self):
-        self.send_to_server("dryGripper()")
+        self.send_to_server("dryGripper")
+        
 
     def enableTScreenGripperCB(self):
-        self.send_to_server("enableDewarTscreen()")
+        self.send_to_server("enableDewarTscreen")
+        
 
     def parkGripperCB(self):
-        self.send_to_server("parkGripper()")
+        self.send_to_server("parkGripper")
+        
 
     def restartServerCB(self):
         if self.controlEnabled():
@@ -4636,14 +4612,15 @@ class ControlMain(QtWidgets.QMainWindow):
 
     def stopRunCB(self):
         logger.info("stopping collection")
-        self.aux_send_to_server("stopDCQueue(1)")
+        self.aux_send_to_server("stopDCQueue", [1])
 
     def stopQueueCB(self):
         logger.info("stopping queue")
         if self.pauseQueueButton.text() == "Continue":
-            self.aux_send_to_server("continue_data_collection()")
+            self.aux_send_to_server("continue_data_collection")
         else:
-            self.aux_send_to_server("stopDCQueue(2)")
+            self.aux_send_to_server("stopDCQueue", [2])
+        
 
     def mountSampleCB(self):
         if getBlConfig("mountEnabled") == 0:
@@ -4658,7 +4635,8 @@ class ControlMain(QtWidgets.QMainWindow):
         else:  # No sample ID found, do nothing
             logger.info("No sample selected, cannot mount")
             return
-        self.send_to_server('mountSample("' + str(self.selectedSampleID) + '")')
+        self.send_to_server("mountSample", [self.selectedSampleID])
+        
         self.zoom2Radio.setChecked(True)
         self.zoomLevelToggledCB("Zoom2")
         self.protoComboBox.setCurrentIndex(self.protoComboBox.findText(str("standard")))
@@ -4666,7 +4644,8 @@ class ControlMain(QtWidgets.QMainWindow):
 
     def unmountSampleCB(self):
         logger.info("unmount sample")
-        self.send_to_server("unmountSample()")
+        self.send_to_server("unmountSample")
+        
 
     def refreshCollectionParams(self, selectedSampleRequest, validate_hdf5=True):
         reqObj = selectedSampleRequest["request_obj"]
@@ -4781,14 +4760,15 @@ class ControlMain(QtWidgets.QMainWindow):
                     )
                     > 5.0
                 ):
-                    comm_s = (
-                        'mvaDescriptor("omega",'
-                        + str(
-                            selectedSampleRequest["request_obj"]["rasterDef"]["omega"]
-                        )
-                        + ")"
+                    
+                    self.send_to_server(
+                        "mvaDescriptor",
+                        [
+                            "omega",
+                            selectedSampleRequest["request_obj"]["rasterDef"]["omega"],
+                        ],
                     )
-                    self.send_to_server(comm_s)
+                    
         if str(reqObj["protocol"]) == "eScan":
             try:
                 self.escan_steps_ledit.setText(str(reqObj["steps"]))
@@ -4825,6 +4805,8 @@ class ControlMain(QtWidgets.QMainWindow):
         self, index
     ):  # I need "index" here? seems like I get it from selmod, but sometimes is passed
         selmod = self.dewarTree.selectionModel()
+        if not selmod:
+            return
         selection = selmod.selection()
         indexes = selection.indexes()
         if len(indexes) == 0:
@@ -5388,24 +5370,41 @@ class ControlMain(QtWidgets.QMainWindow):
             and self.controlMasterCheckBox.isChecked()
         )
 
-    def send_to_server(self, s):
-        if s == "lockControl":
+    def send_to_server(self, function_name: str, args: "Optional[List]" = None, kwargs: "Optional[Dict]" = None):
+        if function_name == "lockControl":
             self.controlMaster_pv.put(0 - self.processID)
             return
-        if s == "unlockControl":
+        if function_name == "unlockControl":
             self.controlMaster_pv.put(self.processID)
             return
         if self.controlEnabled():
             time.sleep(0.01)
-            logger.info("send_to_server: %s" % s)
-            self.comm_pv.put(s)
+            message = self.generate_server_message(function_name, args, kwargs)
+            logger.info(f"send_to_server: {message}")
+            self.comm_pv.put(message)
         else:
             self.popupServerMessage("You don't have control")
 
-    def aux_send_to_server(self, s):
+    def generate_server_message(
+        self, function_name: str, args: "Optional[List]" = None, kwargs: "Optional[Dict]" = None
+    ) -> str:
+        if not args:
+            args = []
+        if not kwargs:
+            kwargs = {}
+        return json.dumps(
+            {
+                "function": function_name,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        )
+
+    def aux_send_to_server(self, function_name: str, args: "Optional[List]" = None, kwargs: "Optional[Dict]" = None):
         if self.controlEnabled():
             time.sleep(0.01)
-            logger.info("aux_send_to_server: %s" % s)
-            self.immediate_comm_pv.put(s)
+            message = self.generate_server_message(function_name, args, kwargs)
+            logger.info(f"aux_send_to_server: {message}")
+            self.immediate_comm_pv.put(message)
         else:
             self.popupServerMessage("You don't have control")

@@ -8,25 +8,25 @@ from epics import PV
 import db_lib
 import det_lib
 import time
-import mysql.connector
+from PIL import Image
 import logging
 logger = logging.getLogger(__name__)
 
 #12/19 - I'm leaving all commented lines alone on this. Karl Levik, DLS, is an immense help with this.
 
-conf_file = os.environ["CONFIGDIR"] + "ispybConfig.cfg"
+conf_file = "/etc/ispyb/ispybConfig.cfg"
 visit = 'mx99999-1'
 # Get a list of request dicts
 #request_dicts = lsdb2.getColRequestsByTimeInterval('2018-02-14T00:00:00','2018-02-15T00:00:00')
 
 # Connect to ISPyB, get the relevant data area objects
-conn = ispyb.open(credentials=conf_file)
-core = ispyb.factory.create_data_area(ispyb.factory.DataAreaType.CORE, conn)
-mxacquisition = ispyb.factory.create_data_area(ispyb.factory.DataAreaType.MXACQUISITION, conn)
-mxprocessing = ispyb.factory.create_data_area(ispyb.factory.DataAreaType.MXPROCESSING, conn)
-mxscreening = ispyb.factory.create_data_area(ispyb.factory.DataAreaType.MXSCREENING, conn)
-cnx = mysql.connector.connect(user='ispyb_api', password=os.environ['ISPYB_PASSWORD'],host='ispyb-db.nsls2.bnl.local',database='ispyb')
-cursor = cnx.cursor()
+#conn = ispyb.open(conf_file)
+#core = ispyb.factory.create_data_area(ispyb.factory.DataAreaType.CORE, conn)
+#mxacquisition = ispyb.factory.create_data_area(ispyb.factory.DataAreaType.MXACQUISITION, conn)
+#mxprocessing = ispyb.factory.create_data_area(ispyb.factory.DataAreaType.MXPROCESSING, conn)
+#mxscreening = ispyb.factory.create_data_area(ispyb.factory.DataAreaType.MXSCREENING, conn)
+#cnx = mysql.connector.connect(user='ispyb_api', password=os.environ['ISPYB_PASSWORD'],host='ispyb-db-dev.cs.nsls2.local',database='ispyb')
+#cursor = cnx.cursor()
 beamline = os.environ["BEAMLINE_ID"]
 
   # Find the id for a particular
@@ -211,6 +211,8 @@ def insertResult(result,resultType,request,visitName,dc_id=None,xmlFileName=None
    sample = request['sample'] # this needs to be created and linked to a DC group
    if (resultType == 'fastDP'):
      mx_data_reduction_dict = xml_file_to_dict(xmlFileName)
+     comm = mx_data_reduction_dict['AutoProcProgramContainer']['AutoProcProgram']['processingCommandLine']
+     mx_data_reduction_dict['AutoProcProgramContainer']['AutoProcProgram']['processingCommandLine'] = comm[len(comm)-255:]
      (app_id, ap_id, scaling_id, integration_id) = mx_data_reduction_to_ispyb(mx_data_reduction_dict, dc_id, mxprocessing)
      mxprocessing.upsert_program_ex(program_id=app_id,status=1)
          
@@ -227,10 +229,13 @@ def insertResult(result,resultType,request,visitName,dc_id=None,xmlFileName=None
      daq_utils.take_crystal_picture(filename=jpegImagePrefix)
      jpegImageFilename = jpegImagePrefix+".jpg"
      jpegImageThumbFilename = jpegImagePrefix+"t.jpg"
-     node = db_lib.getBeamlineConfigParam(beamline,"adxvNode")
-     comm_s = f"ssh -q {node} \"{os.environ['MXPROCESSINGSCRIPTSDIR']}resize.sh {jpegImageFilename} {jpegImageThumbFilename} 40% \"&"
-     logger.info('resizing image: %s' % comm_s)
-     os.system(comm_s)
+     resizeRatio = 0.4
+     logger.info(f'resizing image: ratio: {resizeRatio} filename: {jpegImageThumbFilename}')
+     fullSnapshot = Image.open(jpegImageFilename)
+     resizeWidth = fullSnapshot.width * resizeRatio
+     resizeHeight = fullSnapshot.height * resizeRatio
+     thumbSnapshot = fullSnapshot.resize((int(resizeWidth), int(resizeHeight)))
+     thumbSnapshot.save(jpegImageThumbFilename)
      
      seqNum = int(det_lib.detector_get_seqnum())          
      node = db_lib.getBeamlineConfigParam(beamline,"adxvNode")
@@ -394,6 +399,7 @@ def insertRasterResult(request,visitName):
  except ISPyBNoResultException as e:
    logger.error("insertRasterResult - caught ISPyBNoResultException: '%s'. make sure visit name is in the format mx999999-1234. NOT HAVING MX IN FRONT IS A SIGN OF PROBLEMS - try newVisit() in that case." % e)
    return
+ request = db_lib.getRequestByID(request_id)
  sample = request['sample'] # this needs to be created and linked to a DC group
  #result_obj = result['result_obj'] this doesn't appear to be used -DK
  request_obj = request['request_obj']
