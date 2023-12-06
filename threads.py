@@ -5,6 +5,7 @@ import cv2
 import os
 import sys
 import urllib
+from urllib.parse import urlparse
 from io import BytesIO
 import logging
 from config_params import SERVER_CHECK_DELAY
@@ -134,6 +135,14 @@ class ServerCheckThread(QThread):
     currently for redis, cv2, and a generic http jpeg image. will get the image and return a qimage object
 '''
 
+'''
+all input links are in the form
+function://ip:port/key
+for example
+redis://10.67.146.131:6379/bzoom:RAW
+
+'''
+
 class CameraObject():
 
     '''
@@ -196,23 +205,28 @@ class CameraObject():
         return self.type
 
     def setupUrlConnection(self, url):
-        redismatch = re.match(r'redis://([\d\.]+):(\d+)/(.+)', url)
-        linkmatch = re.match(r'http://([\d\.]+):(\d+)/(.+)', url)
-        #Splits link into http:// ip : port / key
+        #parsing URL using urlparse
+        split_url = urlparse(url)
 
-        #could use regex to check for specific ip's of camera network/redis network etc.
+        self.scheme = split_url.scheme
+        self.host = split_url.hostname
+        self.port = split_url.port
+        #removing the / in the path
+        self.key = split_url.path[1:]
+        self.query = split_url.query
 
-        if redismatch:
+        #checking netloc to see if there is a formatting problem in the input string
+        if self.scheme == 'redis' and split_url.netloc != '':
             #parse url
-            ip = redismatch.group(1)
-            port = redismatch.group(2)
-            self.key = redismatch.group(3)
-            self.camera = redis.StrictRedis(host=ip, port=port, db=0)
+            #ip = redismatch.group(1)
+            #port = redismatch.group(2)
+            #self.key = redismatch.group(3)
+            self.camera = redis.StrictRedis(host=self.host, port=self.port, db=0)
             self.type='redis'
             self.getfunction = self.redisGet
-            self.url = redismatch.group(0)
+            self.url = split_url
             return self.type
-        elif linkmatch:
+        elif self.scheme == 'https' and split_url.netloc != '':
             self.key = url
             self.type = 'url'
             self.getfunction = self.urlGet
@@ -222,7 +236,6 @@ class CameraObject():
             message = 'incorrect camera object function init. stopping!'
             logger.error(message)
             return
-
 
 
  #IF inputting with both and obejct url and url it will use the url input 
