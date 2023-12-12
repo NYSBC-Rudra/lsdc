@@ -4646,21 +4646,36 @@ class ControlMain(QtWidgets.QMainWindow):
             self.aux_send_to_server("stopDCQueue(2)")
 
     def mountSampleCB(self):
-        if getBlConfig("mountEnabled") == 0:
+        if (getBlConfig("mountEnabled") == 0):
             self.popupServerMessage("Mounting disabled!! Call staff!")
             return
         logger.info("mount selected sample")
-        self.eraseCB()
-        if (
-            self.dewarTree.getSelectedSample()
-        ):  # If sample ID is not found check the dewartree directly
-            self.selectedSampleID = self.dewarTree.getSelectedSample()
-        else:  # No sample ID found, do nothing
-            logger.info("No sample selected, cannot mount")
+        self.eraseCB()      
+        try:
+            
+            #current mounted sample
+            current = self.selectedSampleID #add this line Alex
+            
+            self.selectedSampleID = self.selectedSampleRequest["sample"]
+            
+            # #check if the current mounted sample is the same as the new selected sample, Alex
+            # if current == self.selectedSampleID: #add this line
+            #     self.popupServerMessage("You had clicked on MOUNT SAMPLE button, your selected sample, " + str(self.selectedSampleID)+ ", is already mounted") #add this line Alex
+            #     return #add this line Alex
+            
+            # check if the current mounted sample is the same as the new selected sample
+
+            if current == self.selectedSampleID:  # add this line Alex
+                QtWidgets.QMessageBox.information(self, "Information", 
+                                        "You had clicked on MOUNT SAMPLE button, your selected sample, " 
+                                        + str(self.selectedSampleID) + ", is already mounted")  # add this line Alex
+                return  # add this line Alex
+        except KeyError as e:
+            logger.error('unable to get sample')
             return
-        self.send_to_server('mountSample("' + str(self.selectedSampleID) + '")')
-        self.zoom2Radio.setChecked(True)
-        self.zoomLevelToggledCB("Zoom2")
+        self.send_to_server("mountSample(\""+str(self.selectedSampleID)+"\")")
+        self.zoom1Radio.setChecked(True)      
+        self.zoomLevelToggledCB("Zoom1")
         self.protoComboBox.setCurrentIndex(self.protoComboBox.findText(str("standard")))
         self.protoComboActivatedCB("standard")
 
