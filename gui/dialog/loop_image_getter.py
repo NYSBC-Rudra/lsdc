@@ -8,7 +8,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
 from qtpy import uic
 
-import gon_lib
+
 
 
 if typing.TYPE_CHECKING:
