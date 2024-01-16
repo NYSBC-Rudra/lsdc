@@ -52,6 +52,7 @@ from gui.dialog import (
     SnapCommentDialog,
     StaffScreenDialog,
     UserScreenDialog,
+    OmegaRotatorDialog
 )
 from gui.raster import RasterCell, RasterGroup
 from QPeriodicTable import QPeriodicTable
@@ -5183,7 +5184,8 @@ class ControlMain(QtWidgets.QMainWindow):
     
     def loopActionCB(self):
         if self.controlEnabled():
-            self.OmegaRotatorDialog.show()
+            self.sub = OmegaRotatorDialog(self)
+            self.sub.show() 
         else:
             self.popupServerMessage("You don't have control")
 
