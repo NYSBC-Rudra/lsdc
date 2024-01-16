@@ -54,7 +54,7 @@ class RasterStatus(Enum):
 
 
 HUTCH_TIMER_DELAY = 500
-SAMPLE_TIMER_DELAY = 100
+SAMPLE_TIMER_DELAY = 0
 SERVER_CHECK_DELAY = 2000
 
 ROBOT_MIN_DISTANCE = 200.0
@@ -74,7 +74,6 @@ UNMOUNT_STEP_SUCCESSFUL = 2
 PINS_PER_PUCK = 16
 
 DETECTOR_OBJECT_TYPE_LSDC = "lsdc"  # using det_lib
-DETECTOR_OBJECT_TYPE_NO_INIT = "no init" # skip epics detector init
 DETECTOR_OBJECT_TYPE_OPHYD = "ophyd"  # instantiated in start_bs, using Bluesky scans
 DETECTOR_OBJECT_TYPE = "detectorObjectType"
 
@@ -82,13 +81,37 @@ DETECTOR_SAFE_DISTANCE = 200.0
 
 GOVERNOR_TIMEOUT = 120  # seconds for a governor move
 
-DEWAR_SECTORS = {"amx": 8, "fmx": 8, "nyx": 8}
+DEWAR_SECTORS = {"amx": 8, "fmx": 8, "nyx": 5}
 PUCKS_PER_DEWAR_SECTOR = {"amx": 3, "fmx": 3, "nyx": 3}
 
 cryostreamTempPV = {"amx": "AMX:cs700:gasT-I", "fmx": "FMX:cs700:gasT-I"}
 
-VALID_EXP_TIMES = {'amx':{'min':0.005, 'max':1, 'digits':3}, 'fmx':{'min':0.01, 'max':10, 'digits':3}, 'nyx':{'min':0.002, 'max':10, 'digits':4}}
-VALID_DET_DIST = {'amx':{'min': 100, 'max':500, 'digits':3}, 'fmx':{'min':137, 'max':2000, 'digits':2}, 'nyx':{'min':100, 'max':500, 'digits':3}}
-VALID_TOTAL_EXP_TIMES = {'amx':{'min':0.005, 'max':300, 'digits':3}, 'fmx':{'min':0.01, 'max':300, 'digits':3}, 'nyx':{'min':0.01, 'max':1000, 'digits':3}}
-VALID_PREFIX_LENGTH = 25 #TODO centralize with spreadsheet validation?
-VALID_PREFIX_NAME = '[0-9a-zA-Z-_]{0,%s}' % VALID_PREFIX_LENGTH
+VALID_EXP_TIMES = {
+    "amx": {"min": 0.005, "max": 1, "digits": 3},
+    "fmx": {"min": 0.01, "max": 10, "digits": 3},
+    "nyx": {"min": 0.002, "max": 10, "digits": 4},
+}
+VALID_DET_DIST = {
+    "amx": {"min": 100, "max": 500, "digits": 3},
+    "fmx": {"min": 137, "max": 2000, "digits": 2},
+    "nyx": {"min": 100, "max": 500, "digits": 3},
+}
+VALID_TOTAL_EXP_TIMES = {
+    "amx": {"min": 0.005, "max": 300, "digits": 3},
+    "fmx": {"min": 0.01, "max": 300, "digits": 3},
+    "nyx": {"min": 0.01, "max": 1000, "digits": 3},
+}
+VALID_PREFIX_LENGTH = 25  # TODO centralize with spreadsheet validation?
+VALID_PREFIX_NAME = "[0-9a-zA-Z-_]{0,%s}" % VALID_PREFIX_LENGTH
+VALID_TRANSMISSION = {
+    "amx": {"min": 0.001, "max": 1.0, "digits": 3},
+    "fmx": {"min": 0.001, "max": 1.0, "digits": 3},
+    "nyx": {"min": 0.001, "max": 0.999, "digits": 3},
+}
+
+LSDC_SERVICE_USERS = ("lsdc-amx", "lsdc-fmx", "lsdc-nyx")
+IS_STAFF = (
+    True
+    if os.environ["STAFF_GROUP"] in [grp.getgrgid(g).gr_name for g in os.getgroups()]
+    else False
+)
