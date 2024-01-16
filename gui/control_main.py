@@ -5181,7 +5181,7 @@ class ControlMain(QtWidgets.QMainWindow):
             self.popupServerMessage("You don't have control")
 
     
-        def loopActionCB(self):
+    def loopActionCB(self):
         if self.controlEnabled():
             self.OmegaRotatorDialog.show()
         else:
