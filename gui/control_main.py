@@ -5093,6 +5093,10 @@ class ControlMain(QtWidgets.QMainWindow):
         self.statusBar()
         self.queue_collect_status_widget = QtWidgets.QLabel("Queue Collect: ON")
         self.statusBar().addPermanentWidget(self.queue_collect_status_widget)
+
+        self.loopAction = QtWidgets.QAction("loop image getter...", self)
+        self.loopAction.triggered.connect(self.loopActionCB)
+
         menubar = self.menuBar()
         fileMenu = menubar.addMenu("&File")
         settingsMenu = menubar.addMenu("Settings")
@@ -5100,6 +5104,9 @@ class ControlMain(QtWidgets.QMainWindow):
         fileMenu.addAction(self.userAction)
         fileMenu.addAction(self.expertAction)
         fileMenu.addAction(self.staffAction)
+        fileMenu.addAction(self.loopAction)
+
+
         # Define all of the available actions for the overlay color group
         self.BlueOverlayAction = QtWidgets.QAction("Blue", self, checkable=True)
         self.RedOverlayAction = QtWidgets.QAction("Red", self, checkable=True)
@@ -5170,6 +5177,13 @@ class ControlMain(QtWidgets.QMainWindow):
     def popStaffDialogCB(self):
         if self.controlEnabled():
             self.staffScreenDialog.show()
+        else:
+            self.popupServerMessage("You don't have control")
+
+    
+        def loopActionCB(self):
+        if self.controlEnabled():
+            self.OmegaRotatorDialog.show()
         else:
             self.popupServerMessage("You don't have control")
 
