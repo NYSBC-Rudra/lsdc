@@ -79,6 +79,7 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         try:
             total_rotation = float(self.total_rotation.text())
             interval = float(self.interval.text())
+            self.getOmega()
         except:
             logger.info('Not a valid float for either rotation or interval')
             return
