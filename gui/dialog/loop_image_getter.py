@@ -28,13 +28,23 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
 
         layout = QtWidgets.QVBoxLayout()
 
+        total_rotation_label = QtWidgets.QLabel("Total Rotation (use negative to go the other way):")
         self.total_rotation = QtWidgets.QLineEdit()
+
+        interval_label = QtWidgets.QLabel("Interval (make negative if total rotation is negative):")
         self.interval = QtWidgets.QLineEdit()
+
+        button_label = QtWidgets.QLabel("Run loop:")
         self.button = QtWidgets.QPushButton("Submit")
         self.button.clicked.connect(self.runLoop)
 
+        layout.addWidget(total_rotation_label)
         layout.addWidget(self.total_rotation)
+
+        layout.addWidget(interval_label)
         layout.addWidget(self.interval)
+
+        layout.addWidget(button_label)
         layout.addWidget(self.button)
 
         self.setLayout(layout)
