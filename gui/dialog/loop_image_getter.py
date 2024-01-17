@@ -67,12 +67,9 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         return
     
     def saveImage(self, name):
-        file = BytesIO(urllib.request.urlopen('http://10.67.147.26:3908/video_feed2', timeout=1000/1000).read())
-        image = Image.open(file)
-        image_bytes = BytesIO()
-        image.save(image_bytes, format='JPEG')
-        image_bytes = image_bytes.getvalue()
-        image_bytes.save('{}.jpg'.format(name))
+        myfile = BytesIO(urllib.request.urlopen('http://10.67.147.26:3908/video_feed2', timeout=1000/1000).read())
+        image = Image.open(myfile)
+        image.save(name, format='JPEG')
         return
     
     def runLoop(self):
