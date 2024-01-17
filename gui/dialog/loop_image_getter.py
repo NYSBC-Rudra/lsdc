@@ -17,8 +17,9 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger()
 
 class OmegaRotatorDialog(QtWidgets.QDialog):
-    def __init__(self, parent: "ControlMain"):
+    def __init__(self,md2, parent: "ControlMain"):
         super(OmegaRotatorDialog, self).__init__(parent)
+        self.md2 = md2
         self.current_omega = self.getOmega()
         self.initUI()
 
@@ -41,6 +42,7 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
     def getOmega(self):
         setcheck= False
         while setcheck != True:
+            #add md2 through control_main
             state = self.md2.exporter.read('OmegaState')
             if state == 'Ready':
                 setcheck  = True
