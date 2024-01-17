@@ -24,7 +24,7 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         self.initUI()
 
     def initUI(self):
-        self.setFixedSize(200, 300)
+        self.setFixedSize(300, 400)
 
         layout = QtWidgets.QVBoxLayout()
 
@@ -58,6 +58,7 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
                 setcheck  = True
 
         self.current_omega = self.md2.omega.get()[0]
+        logger.info('{}: current omega'.format(str(self.current_omega)))
         return
 
     def setOmega(self, omega):
@@ -81,10 +82,10 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         except:
             logger.info('Not a valid float for either rotation or interval')
             return
-
+        logger.info('Starting rotation from {} to {}'.format(str(self.current_omega, str(self.current_omega + total_rotation+1)))
         for i in range(self.current_omega, self.current_omega + total_rotation+1, interval):
-            name = '{}_{}-{}'.format(str(self.current_omega), str(i), str(total_rotation) )
-            self.saveImage(name)
+            logger.info('Setting omega to {}'.format(str(i)))
+            file_name = '{}_{}-{}'.format(str(self.current_omega), str(i), str(total_rotation) )
+            self.saveImage(file_name)
             self.setOmega(i)
-
         return
