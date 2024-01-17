@@ -50,15 +50,8 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         self.setLayout(layout)
 
     def getOmega(self):
-        setcheck= False
-        while setcheck != True:
-            #add md2 through control_main
-            state = self.md2.exporter.read('OmegaState')
-            if state == 'Ready':
-                setcheck  = True
-
         self.current_omega = self.md2.omega.get()[0]
-        logger.info('{}: current omega'.format(str(self.current_omega)))
+        #logger.info('{}: current omega from running getOmega'.format(str(self.current_omega)))
         return
 
     def setOmega(self, omega):
@@ -69,7 +62,7 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
     def saveImage(self, name):
         myfile = BytesIO(urllib.request.urlopen('http://10.67.147.26:3908/video_feed2', timeout=1000/1000).read())
         image = Image.open(myfile)
-        image.save(name, format='JPEG')
+        image.save('{}.jpg'.format(name), format='JPEG')
         return
     
     def runLoop(self):
@@ -89,12 +82,16 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
             max_value = max_value - 1
         else:
             max_value = max_value +1
-        while(abs(self.current_omega - max_value) > abs(interval)):
-            next_value = self.current_omega + interval
-            file_name = '{}_{}-{}'.format(str(self.current_omega), str(next_value), str(total_rotation) )
-            self.saveImage(file_name)
-            logger.info('Setting omega to {}'.format(str(next_value)))
-            self.setOmega(next_value)
+        current_value = self.current_omega
+        while(abs(current_value - max_value) > abs(interval)):
+            state = self.md2.exporter.read('OmegaState')
+            if state == 'Ready':
+                next_value = self.current_omega + interval
+                file_name = '{}_{}-{}'.format(str(int(self.current_omega)), str(int(next_value)), str(int(total_rotation)) )
+                self.saveImage(file_name)
+                logger.info('Setting omega to {}'.format(str(next_value)))
+                self.setOmega(next_value)
+                current_value = next_value
         return
 
 
