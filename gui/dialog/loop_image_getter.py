@@ -86,9 +86,22 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         logger.info('Starting rotation from {}'.format(str(self.current_omega)))
         logger.info('Total rotation is {}'.format(str(total_rotation)))
         logger.info('interval is {}'.format(str(interval)))
-        for i in range(self.current_omega, self.current_omega + total_rotation+1, interval):
-            logger.info('Setting omega to {}'.format(str(i)))
-            file_name = '{}_{}-{}'.format(str(self.current_omega), str(i), str(total_rotation) )
+
+        max_value = self.current_omega + total_rotation
+        if total_rotation < 0:
+            max_value = max_value - 1
+        else:
+            max_value = max_value +1
+        while(abs(self.current_omega - max_value) > abs(interval)):
+            next_value = self.current_omega + interval
+            file_name = '{}_{}-{}'.format(str(self.current_omega), str(next_value), str(total_rotation) )
             self.saveImage(file_name)
-            self.setOmega(i)
+            logger.info('Setting omega to {}'.format(str(next_value)))
+            self.setOmega(next_value)
         return
+
+
+
+
+
+
