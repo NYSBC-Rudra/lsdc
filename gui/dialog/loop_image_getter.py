@@ -2,7 +2,7 @@ import logging
 import typing
 from PIL import Image
 from io import BytesIO
-import urllib
+import urllib.request
 
 from qtpy import QtCore, QtGui, QtWidgets
 from qtpy.QtCore import Qt
@@ -77,12 +77,12 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         logger.info('Total rotation is {}'.format(str(total_rotation)))
         logger.info('interval is {}'.format(str(interval)))
 
-        max_value = self.current_omega + total_rotation
+        max_value = int(self.current_omega + total_rotation)
         if total_rotation < 0:
             max_value = max_value - 1
         else:
             max_value = max_value +1
-        current_value = self.current_omega
+        current_value = int(self.current_omega)
         while(abs(current_value - max_value) > abs(interval)):
             state = self.md2.exporter.read('OmegaState')
             if state == 'Ready':
