@@ -56,7 +56,7 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
 
     def setOmega(self, omega):
         self.md2.omega.set(omega)
-        self.getOmega()
+        self.current_omega = omega
         return
     
     def saveImage(self, name):
@@ -65,7 +65,7 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         image.save('{}.jpg'.format(name), format='JPEG')
         return
     
-    def runLoop(self):
+    def runLoop(self, do_not_spin=False):
         try:
             total_rotation = float(self.total_rotation.text())
             interval = float(self.interval.text())
@@ -83,17 +83,25 @@ class OmegaRotatorDialog(QtWidgets.QDialog):
         else:
             max_value = max_value +1
         current_value = int(self.current_omega)
+
+
         while(abs(current_value - max_value) > abs(interval)):
+
             state = self.md2.exporter.read('OmegaState')
             if state == 'Ready':
+                self.getOmega()
+
                 next_value = self.current_omega + interval
                 file_name = '{}_{}-{}'.format(str(int(self.current_omega)), str(int(next_value)), str(int(total_rotation)) )
                 self.saveImage(file_name)
-                logger.info('Setting omega to {}'.format(str(next_value)))
-                self.setOmega(next_value)
-                current_value = next_value
-        return
 
+
+                logger.info('Setting omega to {}'.format(str(next_value)))
+
+                current_value = next_value
+                if do_not_spin==False:
+                    self.setOmega(current_value)
+        return
 
 
 
