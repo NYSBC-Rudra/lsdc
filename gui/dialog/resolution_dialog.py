@@ -139,16 +139,16 @@ class CalculatorWindow(QtWidgets.QDialog):
 		d_value = self.d_value_enter.displayText()
 		#checking if value is string or none if not calculating that value (trying to use .isalpha but not when value is None)
 		if ((d_value == "" or d_value[0].isalpha() == True) and checked_key != 'd') :
-			self.bottom_text.setText("formula to calculate {} requires d value".format(checked_key))
+			self.bottom_text.setText("Formula to calculate {} requires d value".format(checked_key))
 			return
 
 		l_value = self.L_value_enter.displayText()
 		if ((l_value == "" or l_value[0].isalpha() == True) and checked_key != 'L'):
-			self.bottom_text.setText("formula to calculate {} requires L value".format(checked_key))
+			self.bottom_text.setText("Formula to calculate {} requires L value.".format(checked_key))
 			return
 		elif l_value != '' and checked_key != 'L':
 			if float(l_value) < 140 or float(l_value) > 350:
-				self.bottom_text.setText("detector to crystal distance must be between 140 and 350mm")	
+				self.bottom_text.setText("Detector to crystal distance must be between 140 and 350mm.")	
 				return
 
 
@@ -161,7 +161,7 @@ class CalculatorWindow(QtWidgets.QDialog):
 
 		wave_value = self.wave_value_enter.displayText()
 		if ((wave_value == "" or wave_value[0].isalpha() == True) and checked_key != 'wavelength'):
-			self.bottom_text.setText("formula to calculate {} requires the wavelength".format(checked_key))
+			self.bottom_text.setText("Formula to calculate {} requires the wavelength.".format(checked_key))
 			return
 
 
