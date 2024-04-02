@@ -242,6 +242,7 @@ class ControlMain(QtWidgets.QMainWindow):
                 self.changeControlMasterCB(1)
                 self.controlMasterCheckBox.setChecked(True)
         self.XRFInfoDict = self.parseXRFTable()  # I don't like this
+        self.current_mounting_sample = None
 
     def setGuiValues(self, values):
         for item, value in values.items():
@@ -4784,7 +4785,7 @@ class ControlMain(QtWidgets.QMainWindow):
         
         
         if (
-            self.mountedPin_pv.get() == self.selectedSampleID
+            self.mountedPin_pv.get() == self.selectedSampleID or self.selectedSampleID == self.current_mounting_sample
         ):
             logger.info("sample already mounted")
             self.popupServerMessage("sample already mounted")
@@ -4793,6 +4794,7 @@ class ControlMain(QtWidgets.QMainWindow):
             
         
         self.send_to_server('mountSample("' + str(self.selectedSampleID) + '")')
+        self.current_mounting_sample = self.selectedSampleID
         self.zoom2Radio.setChecked(True)
         self.zoomLevelToggledCB("Zoom2")
         self.protoComboBox.setCurrentIndex(self.protoComboBox.findText(str("standard")))
