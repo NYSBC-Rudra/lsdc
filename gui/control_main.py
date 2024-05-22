@@ -1499,7 +1499,7 @@ class ControlMain(QtWidgets.QMainWindow):
 
         if daq_utils.beamline == "nyx":  # hiding unused GUI elements
            
-            self.protoRasterRadio.setVisible(False)
+            self.protoRasterRadio.setVisible(True)
             self.protoStandardRadio.setVisible(False)
             self.protoVectorRadio.setVisible(False)
             self.protoOtherRadio.setVisible(False)
