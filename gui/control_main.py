@@ -1498,6 +1498,7 @@ class ControlMain(QtWidgets.QMainWindow):
         self.zoomLevelToggledCB("Zoom1")
 
         if daq_utils.beamline == "nyx":  # hiding unused GUI elements
+           
             self.protoRasterRadio.setVisible(False)
             self.protoStandardRadio.setVisible(False)
             self.protoVectorRadio.setVisible(False)
@@ -1505,11 +1506,13 @@ class ControlMain(QtWidgets.QMainWindow):
             self.autoProcessingCheckBox.setVisible(False)
             self.fastEPCheckBox.setVisible(False)
             self.dimpleCheckBox.setVisible(False)
-            self.centeringComboBox.setVisible(False)
+            #want to view centering combobox
+            self.centeringComboBox.setVisible(True)
             annealButton.setVisible(False)
             #unhiding center loop button
             #centerLoopButton.setVisible(False)
-            clearGraphicsButton.setVisible(False)
+             #unhiding cleargraphicsbutton
+            clearGraphicsButton.setVisible(True)
             saveCenteringButton.setVisible(False)
             selectAllCenteringButton.setVisible(False)
             snapshotButton.setVisible(False)
