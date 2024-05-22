@@ -1499,7 +1499,7 @@ class ControlMain(QtWidgets.QMainWindow):
 
         if daq_utils.beamline == "nyx":  # hiding unused GUI elements
            
-            self.protoRasterRadio.setVisible(True)
+            self.protoRasterRadio.setVisible(False)
             self.protoStandardRadio.setVisible(False)
             self.protoVectorRadio.setVisible(False)
             self.protoOtherRadio.setVisible(False)
@@ -1507,7 +1507,7 @@ class ControlMain(QtWidgets.QMainWindow):
             self.fastEPCheckBox.setVisible(False)
             self.dimpleCheckBox.setVisible(False)
             #want to view centering combobox
-            self.centeringComboBox.setVisible(True)
+            self.centeringComboBox.setVisible(False)
             annealButton.setVisible(False)
             #unhiding center loop button
             #centerLoopButton.setVisible(False)
