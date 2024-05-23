@@ -1266,6 +1266,8 @@ class ControlMain(QtWidgets.QMainWindow):
         runRastersButton = QtWidgets.QPushButton("Run\nRaster")
         runRastersButton.clicked.connect(self.runRastersCB)
         clearGraphicsButton = QtWidgets.QPushButton("Clear")
+        drawRasterButton = QtWidgets.QPushButton("Draw Raster")
+        drawRasterButton.clicked.connect(self.AddRemoveRasterCB)
         clearGraphicsButton.clicked.connect(self.eraseCB)
         self.click3Button = QtWidgets.QPushButton("3-Click\nCenter")
         self.click3Button.clicked.connect(self.center3LoopCB)
@@ -1276,6 +1278,7 @@ class ControlMain(QtWidgets.QMainWindow):
         selectAllCenteringButton = QtWidgets.QPushButton("Select All\nCenterings")
         selectAllCenteringButton.clicked.connect(self.selectAllCenterCB)
         hBoxSampleAlignLayout.addWidget(centerLoopButton)
+        hBoxSampleAlignLayout.addWidget(drawRasterButton)
         hBoxSampleAlignLayout.addWidget(clearGraphicsButton)
         hBoxSampleAlignLayout.addWidget(saveCenteringButton)
         hBoxSampleAlignLayout.addWidget(selectAllCenteringButton)
@@ -1511,8 +1514,8 @@ class ControlMain(QtWidgets.QMainWindow):
             annealButton.setVisible(False)
             #unhiding center loop button
             #centerLoopButton.setVisible(False)
-             #unhiding cleargraphicsbutton
-            clearGraphicsButton.setVisible(True)
+            drawRasterButton.setVisible(True)
+            clearGraphicsButton.setVisible(False)
             saveCenteringButton.setVisible(False)
             selectAllCenteringButton.setVisible(False)
             snapshotButton.setVisible(False)
@@ -3452,6 +3455,11 @@ class ControlMain(QtWidgets.QMainWindow):
         if self.rasterPoly != None:
             self.scene.removeItem(self.rasterPoly)
         self.rasterPoly = None
+
+
+    def AddRemoveRasterCB(self):
+        pass
+
 
     def eraseDisplayCB(
         self,
