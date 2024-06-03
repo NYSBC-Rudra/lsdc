@@ -3057,8 +3057,29 @@ class ControlMain(QtWidgets.QMainWindow):
 
 
 
-    def handle_raster_output(self, data):
-        self.raster_output = data
+    def draw_raster_box(self, data):
+        for i in range(len(self.polyPointItems)):
+            self.scene.removeItem(self.polyPointItems[i])
+        polyPointItems = []
+        polyPoints = []
+        points = []
+        pen = QtGui.QPen(QtCore.Qt.red)
+        brush = QtGui.QBrush(QtCore.Qt.red)
+        self.raster_output = eval(data)
+        logger.info(self.raster_output)
+        x0 = self.raster_output[0][0]
+        y0 = self.raster_output[0][1]
+        x1 = self.raster_output[1][0]
+        y1 = self.raster_output[1][1]
+        polyPoints.append(QtCore.QPointF(x0,y1))
+
+
+
+
+
+
+
+
 
 
 
@@ -3070,10 +3091,9 @@ class ControlMain(QtWidgets.QMainWindow):
         self.raster_output = None
         self.raster_process = QProcess(parent=self)
         
-        self.raster_process.finished.connect(lambda: self.handle_raster_output(self.raster_process.readAllStandardOutput().data().decode('utf-8')))
+        self.raster_process.finished.connect(lambda: self.draw_raster_box(self.raster_process.readAllStandardOutput().data().decode('utf-8')))
         #self.raster_process.finished.connect(lambda: self.raster_process.close())
         self.raster_process.start(raster_call)
-        self.raster_process.waitForFinished()
         return self.raster_output
     
 
