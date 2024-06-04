@@ -3071,7 +3071,24 @@ class ControlMain(QtWidgets.QMainWindow):
         y0 = self.raster_output[0][1]
         x1 = self.raster_output[1][0]
         y1 = self.raster_output[1][1]
-        polyPoints.append(QtCore.QPointF(x0,y1))
+        corner1 = QtCore.QPoint(x0, y0)
+        corner2 = QtCore.QPoint(x1, y1)
+        corner3 = QtCore.QPoint(x0, y1)
+        corner4 = QtCore.QPoint(x1, y0)
+        self.raster_positions = [corner1, corner2, corner3, corner4]
+        self.rasterPoly = QtWidgets.QGraphicsPolygonItem(QtGui.QPolygonF(self.raster_positions))
+        self.polyBoundingRect = self.rasterPoly.boundingRect()
+        raster_w = int(self.polyBoundingRect.width())
+        raster_h = int(self.polyBoundingRect.height())
+        center_x = int(self.polyBoundingRect.center().x())
+        center_y = int(self.polyBoundingRect.center().y())
+        stepsizeXPix = self.screenXmicrons2pixels(float(self.rasterStepEdit.text()))
+        stepsizeYPix = self.screenYmicrons2pixels(float(self.rasterStepEdit.text()))
+        self.click_positions = []
+        self.definePolyRaster(
+            raster_w, raster_h, stepsizeXPix, stepsizeYPix, center_x, center_y
+        )
+
 
 
 
