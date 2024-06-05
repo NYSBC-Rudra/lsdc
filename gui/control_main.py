@@ -1259,6 +1259,9 @@ class ControlMain(QtWidgets.QMainWindow):
         hBoxSampleAlignLayout = QtWidgets.QHBoxLayout()
         centerLoopButton = QtWidgets.QPushButton("Center\nLoop")
         centerLoopButton.clicked.connect(self.autoCenterLoopCB)
+        autoRasterButton = QtWidgets.QPushButton("Auto Raster")
+        autoRasterButton.clicked.connect(self.get_raster_coords)
+        self.auto_raster_ongoing = False
         measureButton = QtWidgets.QPushButton("Measure")
         measureButton.clicked.connect(self.measurePolyCB)
         loopShapeButton = QtWidgets.QPushButton("Add Raster\nto Queue")
@@ -1275,6 +1278,7 @@ class ControlMain(QtWidgets.QMainWindow):
         saveCenteringButton.clicked.connect(self.saveCenterCB)
         selectAllCenteringButton = QtWidgets.QPushButton("Select All\nCenterings")
         selectAllCenteringButton.clicked.connect(self.selectAllCenterCB)
+        hBoxSampleAlignLayout.addWidget(autoRasterButton)
         hBoxSampleAlignLayout.addWidget(centerLoopButton)
         hBoxSampleAlignLayout.addWidget(clearGraphicsButton)
         hBoxSampleAlignLayout.addWidget(saveCenteringButton)
@@ -1516,9 +1520,11 @@ class ControlMain(QtWidgets.QMainWindow):
             selectAllCenteringButton.setVisible(False)
             snapshotButton.setVisible(False)
             annealTimeLabel.setVisible(False)
+            
             self.annealTime_ledit.setVisible(False)
             self.vidActionDefineCenterRadio.setVisible(False)
             self.hideRastersCheckBox.setEnabled(True)
+            autoRasterButton.setVisible(True)
             self.vidActionC2CRadio.setEnabled(True)
             self.vidActionRasterExploreRadio.setEnabled(True)
             self.vidActionRasterDefRadio.setEnabled(True)
@@ -3088,6 +3094,7 @@ class ControlMain(QtWidgets.QMainWindow):
         self.definePolyRaster(
             raster_w, raster_h, stepsizeXPix, stepsizeYPix, center_x, center_y
         )
+        self.auto_raster_ongoing = False
 
 
 
@@ -3103,6 +3110,9 @@ class ControlMain(QtWidgets.QMainWindow):
 
 
     def get_raster_coords(self):
+        if self.auto_raster_ongoing == True:
+            self.popupServerMessage("Auto raster is already running")
+            return
         logger.info("getting raster coordinates")
         raster_call = '/nsls2/data/nyx/legacy/Rudra/lsdcSpoofer/get_raster_box'
         self.raster_output = None
@@ -3111,6 +3121,7 @@ class ControlMain(QtWidgets.QMainWindow):
         self.raster_process.finished.connect(lambda: self.draw_raster_box(self.raster_process.readAllStandardOutput().data().decode('utf-8')))
         #self.raster_process.finished.connect(lambda: self.raster_process.close())
         self.raster_process.start(raster_call)
+        self.auto_raster_ongoing = True
         return self.raster_output
     
 
