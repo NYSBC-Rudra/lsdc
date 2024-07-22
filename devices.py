@@ -349,7 +349,7 @@ class MD2Device(GonioDevice):
     def check_three_click_center(self):
         task_name = self.task_info.get()[0]
         task_end_time = self.task_info.get()[3]
-        if task_name == 'Manual Centring' and task_end_time != 'null':
+        if task_name == 'Manual Centring' and task_end_time == 'null':
             self.md2_in_three_click_state = True
             return True
         else:
