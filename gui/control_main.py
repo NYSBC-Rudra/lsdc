@@ -3945,7 +3945,7 @@ class ControlMain(QtWidgets.QMainWindow):
         '''
         if self.md2.md2_in_three_click_state == True:  # 3-click centering
             if daq_utils.exporter_enabled:
-                self.threeClickSignal.emit(self.threeClickCount, (x_click, y_click))
+                self.threeClickSignal.emit([self.threeClickCount, (x_click, y_click)])
                 self.threeClickCount = self.threeClickCount + 1
             else:
                 correctedC2C_x = x_click + ((daq_utils.screenPixX/2) - (self.centerMarker.x() + self.centerMarkerCharOffsetX))
@@ -5189,7 +5189,7 @@ class ControlMain(QtWidgets.QMainWindow):
 
     def beamAvailableChangedCB(self, value=None, char_value=None, **kw):
         threeClickVal = value
-        self.threeClickSignal.emit(threeClickVal, (None, None))
+        self.threeClickSignal.emit([threeClickVal, (None, None)])
 
     def sampleExposedChangedCB(self, value=None, char_value=None, **kw):
         sampleExposedVal = value
