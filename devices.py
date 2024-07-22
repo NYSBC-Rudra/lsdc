@@ -309,6 +309,7 @@ class MD2Device(GonioDevice):
         if self.md2_in_three_click_state == False:
             return 'Not in 3 click mode'
         try:
+            logger.info('omega value = {}\nthreeclickomega = {}'.format(int(self.omega.get().readback),(self.three_click_omega_value+90)%360 ))
             if int(self.omega.get().readback) != (self.three_click_omega_value+90)%360: #checking if rotated 90 degreees
                 return 'omega rotating'
         except Exception as e:
