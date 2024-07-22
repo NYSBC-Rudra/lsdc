@@ -141,6 +141,7 @@ class ControlMain(QtWidgets.QMainWindow):
     gripTempSignal = QtCore.Signal(float)
     ringCurrentSignal = QtCore.Signal(float)
     threeClickSignal = QtCore.Signal(str)
+    threeClickSignal = QtCore.Signal(list)
     sampleExposedSignal = QtCore.Signal(float)
     sampMoveSignal = QtCore.Signal(int, str)
     roiChangeSignal = QtCore.Signal(int, str)
