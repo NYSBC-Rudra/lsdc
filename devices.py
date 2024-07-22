@@ -174,6 +174,7 @@ class MD2Device(GonioDevice):
     task_output = Cpt(EpicsSignalRO, 'LastTaskOutput', name='task_output')
 
 
+    md2_in_three_click_state = False
     def save_center(self):
         self.centring_save.put("__EMPTY__")
 
@@ -302,6 +303,45 @@ class MD2Device(GonioDevice):
                 start_cx, start_cy, number_of_lines, frames_per_line, exposure_time, 
                 invert_direction, use_centring_table, use_fast_mesh_scans]
         return self.exporter.cmd(command, param_list)
+    
+    def send_3_click_command(self, click_signal):
+        if self.md2_in_three_click_state == False:
+            return 'Not in 3 click mode'
+        c2cx_point, c2cy_point = click_signal[1][0], click_signal[1][1]
+        put_string = "{} {}".format(c2cx_point, c2cy_point)
+        self.centring_click.put(put_string)
+        return put_string
+    
+    def start_3_click_center(self):
+        if self.check_three_click_center() == True:
+            self.md2_in_three_click_state = True
+            return 'Already in 3 click mode'
+        self.exporter.cmd("startManualSampleCentring", "")
+        self.three_click_subscription = self.task_status()
+        if self.three_click_subscription == True:
+            self.md2_in_three_click_state = False
+            return '3 click mode finished'
+        self.three_click_subscription.add_callback(self.end_3_click_center)
+        self.md2_in_three_click_state = True
+        return self.three_click_subscription
+    
+    def end_3_click_center(self):
+        task_end_time = self.task_info.value[3]
+        if self.check_three_click_center() == False:
+            self.md2_in_three_click_state = False
+            return 'centering finished at {}'.format(task_end_time)
+        else:
+            self.md2_in_three_click_state = True
+            return 'Still in 3 click mode'
+        
+    def check_three_click_center(self):
+        task_name = self.task_info.value[0]
+        task_end_time = self.task_info.value[3]
+        if task_name == 'Manual Centring' and task_end_time != 'null':
+            return True
+        else:
+            return False
+
     
 class MD2ApertureDevice(Device):
     # this device needs additional signals for "CurrentApertureDiameterIndex" and "ApertureDiameters"
