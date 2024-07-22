@@ -3852,16 +3852,6 @@ class ControlMain(QtWidgets.QMainWindow):
         x_click = float(event.pos().x())
         y_click = float(event.pos().y())
         penRed = QtGui.QPen(QtCore.Qt.red)
-        '''
-        For three click centering, this if statement checks the omega state of the motor.
-        This ideally gives feedback on wether the MD2 is in the rotation portion of the three click centering
-        
-        '''
-        state = self.md2.exporter.read('OmegaState')
-        if state != 'Ready':
-            logger.info('waiting for motor rotation')
-            logger.info('Click not registered')
-            return
         
         #DEFINE CENTER CHECKED
         if self.vidActionDefineCenterRadio.isChecked():
