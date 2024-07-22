@@ -1261,10 +1261,13 @@ class ControlMain(QtWidgets.QMainWindow):
         runRastersButton.clicked.connect(self.runRastersCB)
         clearGraphicsButton = QtWidgets.QPushButton("Clear")
         clearGraphicsButton.clicked.connect(self.eraseCB)
-        self.click3Button = QtWidgets.QPushButton("3-Click\nCenter")
-        self.click3Button.clicked.connect(self.center3LoopCB)
-        
-        self.threeClickCount = 0
+        if daq_utils.beamline == 'nyx':
+            self.click3Button = QtWidgets.QPushButton("3-Click\nCenter")
+            self.click3Button.clicked.connect(self.center3LoopCB)
+            if self.md2.check_three_click_center == True:
+                self.threeClickCount = 2
+            else:
+                self.threeClickCount = 0
         saveCenteringButton = QtWidgets.QPushButton("Save\nCenter")
         saveCenteringButton.clicked.connect(self.saveCenterCB)
         selectAllCenteringButton = QtWidgets.QPushButton("Select All\nCenterings")
@@ -2257,13 +2260,61 @@ class ControlMain(QtWidgets.QMainWindow):
 
     function is processThreClickCentering
     '''
-    def processThreeClickCentering(self, beamAvailVal):
-        if beamAvailVal == '0':
+    def processThreeClickCentering(self, threeClickVal):
+        penGreen = QtGui.QPen(QtCore.Qt.green)
+        x_click = threeClickVal[1][0]
+        y_click = threeClickVal[1][1]
+        if threeClickVal[0] == '0' or threeClickVal[0] == 0:
             self.beamAvailLabel.setText("Beam Available")
             self.beamAvailLabel.setStyleSheet("background-color: #99FF66;")
-        else:
-            self.beamAvailLabel.setText(beamAvailVal)
+
+        elif threeClickVal[0] == 1 and threeClickVal[2] == (None, None):
+            three_click_subscription = self.md2.start_3_click_center()
+            if type(three_click_subscription) == str:
+                #do nothing there is an error
+                logger.info(three_click_subscription)
+                return
+            self.click3Button.setStyleSheet("background-color: yellow")
             self.beamAvailLabel.setStyleSheet("background-color: yellow")
+            three_click_subscription.add_callback(self.endThreeClickCentering)
+
+        else:
+            correctedC2C_x = x_click + ((daq_utils.screenPixX/2) - (self.centerMarker.x() + self.centerMarkerCharOffsetX))
+            correctedC2C_y = y_click + ((daq_utils.screenPixY/2) - (self.centerMarker.y() + self.centerMarkerCharOffsetY))
+            lsdc_x = daq_utils.screenPixX
+            lsdc_y = daq_utils.screenPixY
+            md2_x = self.md2.center_pixel_x.get() * 2
+            md2_y = self.md2.center_pixel_y.get() * 2
+            scale_x = md2_x / lsdc_x
+            scale_y = md2_y / lsdc_y
+            correctedC2C_x = correctedC2C_x * scale_x
+            correctedC2C_y = correctedC2C_y * scale_y
+            three_click_checker = self.md2.send_3_click_command(correctedC2C_x, correctedC2C_y)
+            if three_click_checker == True:
+                self.beamAvailLabel.setText('{} more clicks'.format(str(3-threeClickVal[0])))
+                self.beamAvailLabel.setStyleSheet("background-color: yellow")
+                logger.info('Drawing 3 click line {} at x_value: {} and y_value {}'.format(threeClickVal[0], x_click, y_click))
+                self.threeClickLines.append(
+                    self.scene.addLine(x_click, 0, x_click, 512, penGreen)
+                )
+                self.threeClickCount = self.threeClickCount+1
+            else:
+                logger.info(three_click_checker)
+
+            #Do all the other things required
+        #adding drawing for three click centering
+
+    def endThreeClickCentering(self):
+        self.threeClickCount = 0
+        self.threeClickSignal.emit([self.threeClickCount, (None, None)])
+        self.click3Button.setStyleSheet("background-color: None")
+        
+        #removing drawing for three click centering
+        logger.info('Removing 3 click lines')
+        for i in range(len(self.threeClickLines)):
+            self.scene.removeItem(self.threeClickLines[i])
+        self.threeClickLines = []
+        return
 
     def processSampleExposed(self, sampleExposedVal):
         if int(sampleExposedVal) == 1:
@@ -3107,13 +3158,12 @@ class ControlMain(QtWidgets.QMainWindow):
     def center3LoopCB(self):
         logger.info("3-click center loop")
         self.threeClickCount = 1
-        self.threeClickSignal.emit('{} more clicks'.format(str(4-self.threeClickCount)))
-        #time.sleep(0.3)
-        self.click3Button.setStyleSheet("background-color: yellow")
         if(daq_utils.exporter_enabled):
-            self.md2.exporter.cmd("startManualSampleCentring", "")
+            self.threeClickSignal.emit([self.threeClickCount, (None, None)])
         else:
             self.send_to_server('mvaDescriptor("omega",0)')
+        #time.sleep(0.3)
+
 
     def fillPolyRaster(
         self, rasterReq, waitTime=1
@@ -3801,7 +3851,6 @@ class ControlMain(QtWidgets.QMainWindow):
         super(QtWidgets.QGraphicsPixmapItem, self.pixmap_item).mousePressEvent(event)
         x_click = float(event.pos().x())
         y_click = float(event.pos().y())
-        penGreen = QtGui.QPen(QtCore.Qt.green)
         penRed = QtGui.QPen(QtCore.Qt.red)
         '''
         For three click centering, this if statement checks the omega state of the motor.
@@ -3813,6 +3862,8 @@ class ControlMain(QtWidgets.QMainWindow):
             logger.info('waiting for motor rotation')
             logger.info('Click not registered')
             return
+        
+        #DEFINE CENTER CHECKED
         if self.vidActionDefineCenterRadio.isChecked():
             self.vidActionC2CRadio.setChecked(
                 True
@@ -3851,6 +3902,11 @@ class ControlMain(QtWidgets.QMainWindow):
                 )
             self.send_to_server(comm_s)
             return
+        
+
+
+
+        #Define Raster
         if self.vidActionRasterDefRadio.isChecked():
             self.click_positions.append(event.pos())
             self.polyPointItems.append(
@@ -3859,6 +3915,10 @@ class ControlMain(QtWidgets.QMainWindow):
             if len(self.click_positions) == 4:
                 self.drawInteractiveRasterCB()
             return
+        
+
+
+
         fov = self.getCurrentFOV()
         correctedC2C_x = x_click + ((daq_utils.screenPixX/2) - (self.centerMarker.x() + self.centerMarkerCharOffsetX))
         correctedC2C_y = y_click + ((daq_utils.screenPixY/2) - (self.centerMarker.y() + self.centerMarkerCharOffsetY))
@@ -3880,58 +3940,21 @@ class ControlMain(QtWidgets.QMainWindow):
         elif self.zoom4Radio.isChecked():
             current_viewangle = daq_utils.mag4ViewAngle
         '''
-        Three click centering will update self.threeClickSignal.emit(self.threeClickCount)
+        Three click centering will update self.threeClickSignal.emit(self.threeClickCount, (None, None))
         
         '''
-        if self.threeClickCount > 0:  # 3-click centering
-            self.threeClickCount = self.threeClickCount + 1
-            self.threeClickSignal.emit('{} more clicks'.format(str(4-self.threeClickCount)))
-            #adding drawing for three click centering
-            logger.info('Drawing 3 click line {} at x_value: {} and y_value {}'.format(self.threeClickCount, x_click, y_click))
-            self.threeClickLines.append(
-                self.scene.addLine(x_click, 0, x_click, 512, penGreen)
-            )
-
-            
-            if daq_utils.exporter_enabled: 
+        if self.md2.md2_in_three_click_state == True:  # 3-click centering
+            if daq_utils.exporter_enabled:
+                self.threeClickSignal.emit(self.threeClickCount, (x_click, y_click))
+                self.threeClickCount = self.threeClickCount + 1
+            else:
                 correctedC2C_x = x_click + ((daq_utils.screenPixX/2) - (self.centerMarker.x() + self.centerMarkerCharOffsetX))
                 correctedC2C_y = y_click + ((daq_utils.screenPixY/2) - (self.centerMarker.y() + self.centerMarkerCharOffsetY))
-                lsdc_x = daq_utils.screenPixX
-                lsdc_y = daq_utils.screenPixY
-                md2_x = self.md2.center_pixel_x.get() * 2
-                md2_y = self.md2.center_pixel_y.get() * 2
-                scale_x = md2_x / lsdc_x
-                scale_y = md2_y / lsdc_y
-                correctedC2C_x = correctedC2C_x * scale_x
-                correctedC2C_y = correctedC2C_y * scale_y
-                self.md2.centring_click.put(f"{correctedC2C_x} {correctedC2C_y}")
-            
-                if self.threeClickCount == 4:
-                    self.threeClickCount = 0
-                    self.threeClickSignal.emit('0')
-                    self.click3Button.setStyleSheet("background-color: None")
-                    #removing drawing for three click centering
-                    logger.info('Removing 3 click lines')
-                    for i in range(len(self.threeClickLines)):
-                        self.scene.removeItem(self.threeClickLines[i])
-                    self.threeClickLines = []
-                return
-            else:
                 comm_s = f'center_on_click({correctedC2C_x},{correctedC2C_y},{fov["x"]},{fov["y"]},source="screen",jog=90,viewangle={current_viewangle})'
         else:
             comm_s = f'center_on_click({correctedC2C_x},{correctedC2C_y},{fov["x"]},{fov["y"]},source="screen",maglevel=0,viewangle={current_viewangle})'
         if not self.vidActionRasterExploreRadio.isChecked():
             self.aux_send_to_server(comm_s)
-        if self.threeClickCount == 4:
-            self.threeClickCount = 0
-            self.threeClickSignal.emit('0')
-            self.click3Button.setStyleSheet("background-color: None")
-            #removing drawing for three cick centering
-            logger.info('Removing 3 click lines')
-            for i in range(len(self.threeClickLines)):
-                self.scene.removeItem(self.threeClickLines[i])
-                logger.info('Removed line {}'.format(i))
-            self.threeClickLines = []
 
         return
 
@@ -5166,7 +5189,7 @@ class ControlMain(QtWidgets.QMainWindow):
 
     def beamAvailableChangedCB(self, value=None, char_value=None, **kw):
         threeClickVal = value
-        self.threeClickSignal.emit(threeClickVal)
+        self.threeClickSignal.emit(threeClickVal, (None, None))
 
     def sampleExposedChangedCB(self, value=None, char_value=None, **kw):
         sampleExposedVal = value
@@ -5223,6 +5246,7 @@ class ControlMain(QtWidgets.QMainWindow):
             self.aperture = MD2ApertureDevice("XF:19IDC-ES{MD2}:", name="aperture")
         else:
             pass
+        
 
     def initUI(self):
         self.tabs = QtWidgets.QTabWidget()
@@ -5515,8 +5539,10 @@ class ControlMain(QtWidgets.QMainWindow):
             self.cryostreamTemp_pv.add_callback(self.cryostreamTempChangedCB)
         self.ringCurrentSignal.connect(self.processRingCurrent)
         self.ringCurrent_pv.add_callback(self.ringCurrentChangedCB)
-        self.threeClickSignal.connect(self.processThreeClickCentering)
-        self.beamAvailable_pv.add_callback(self.beamAvailableChangedCB)
+        if daq_utils.beamline == "nyx":
+            self.threeClickSignal.connect(self.processThreeClickCentering)
+        if daq_utils.beamline != "nyx":
+            self.beamAvailable_pv.add_callback(self.beamAvailableChangedCB)
         self.sampleExposedSignal.connect(self.processSampleExposed)
         self.sampleExposed_pv.add_callback(self.sampleExposedChangedCB)
         self.highMagCursorChangeSignal.connect(self.processHighMagCursorChange)

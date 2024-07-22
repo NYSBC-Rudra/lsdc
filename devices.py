@@ -305,7 +305,7 @@ class MD2Device(GonioDevice):
                 invert_direction, use_centring_table, use_fast_mesh_scans]
         return self.exporter.cmd(command, param_list)
     
-    def send_3_click_command(self, click_signal):
+    def send_3_click_command(self, click_points):
         if self.md2_in_three_click_state == False:
             return 'Not in 3 click mode'
         try:
@@ -315,7 +315,7 @@ class MD2Device(GonioDevice):
             print(e)
             print('three click centering not started yet so self.three_click_omega_value doesnt exist?')
 
-        c2cx_point, c2cy_point = click_signal[1][0], click_signal[1][1]
+        c2cx_point, c2cy_point = click_points[0], click_points[1]
         put_string = "{} {}".format(c2cx_point, c2cy_point)
         self.three_click_omega_value = self.omega.val()
         self.centring_click.put(put_string)
@@ -349,8 +349,10 @@ class MD2Device(GonioDevice):
         task_name = self.task_info.value[0]
         task_end_time = self.task_info.value[3]
         if task_name == 'Manual Centring' and task_end_time != 'null':
+            self.md2_in_three_click_state = True
             return True
         else:
+            self.md2_in_three_click_state = False
             return False
 
     
