@@ -140,7 +140,6 @@ class ControlMain(QtWidgets.QMainWindow):
     fastShutterSignal = QtCore.Signal(float)
     gripTempSignal = QtCore.Signal(float)
     ringCurrentSignal = QtCore.Signal(float)
-    threeClickSignal = QtCore.Signal(str)
     threeClickSignal = QtCore.Signal(list)
     sampleExposedSignal = QtCore.Signal(float)
     sampMoveSignal = QtCore.Signal(int, str)
