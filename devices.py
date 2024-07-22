@@ -175,6 +175,7 @@ class MD2Device(GonioDevice):
 
 
     md2_in_three_click_state = False
+    
     def save_center(self):
         self.centring_save.put("__EMPTY__")
 
@@ -307,10 +308,13 @@ class MD2Device(GonioDevice):
     def send_3_click_command(self, click_signal):
         if self.md2_in_three_click_state == False:
             return 'Not in 3 click mode'
+        
+        elif self.omega.val() == (self.three_click_omega_value+90)%360: #checking if rotated 90 degreees
+            return 'omega rotating'
         c2cx_point, c2cy_point = click_signal[1][0], click_signal[1][1]
         put_string = "{} {}".format(c2cx_point, c2cy_point)
         self.centring_click.put(put_string)
-        return put_string
+        return True
     
     def start_3_click_center(self):
         if self.check_three_click_center() == True:
@@ -323,6 +327,7 @@ class MD2Device(GonioDevice):
             return '3 click mode finished'
         self.three_click_subscription.add_callback(self.end_3_click_center)
         self.md2_in_three_click_state = True
+        self.three_click_omega_value = self.omega.val()
         return self.three_click_subscription
     
     def end_3_click_center(self):
