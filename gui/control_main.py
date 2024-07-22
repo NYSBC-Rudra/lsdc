@@ -2268,7 +2268,7 @@ class ControlMain(QtWidgets.QMainWindow):
             self.beamAvailLabel.setText("Beam Available")
             self.beamAvailLabel.setStyleSheet("background-color: #99FF66;")
 
-        elif threeClickVal[0] == 1 and threeClickVal[2] == (None, None):
+        elif threeClickVal[0] == 1 and threeClickVal[1] == (None, None):
             three_click_subscription = self.md2.start_3_click_center()
             if type(three_click_subscription) == str:
                 #do nothing there is an error
