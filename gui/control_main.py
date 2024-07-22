@@ -2289,7 +2289,7 @@ class ControlMain(QtWidgets.QMainWindow):
             scale_y = md2_y / lsdc_y
             correctedC2C_x = correctedC2C_x * scale_x
             correctedC2C_y = correctedC2C_y * scale_y
-            three_click_checker = self.md2.send_3_click_command(correctedC2C_x, correctedC2C_y)
+            three_click_checker = self.md2.send_3_click_command((correctedC2C_x, correctedC2C_y))
             if three_click_checker == True:
                 self.beamAvailLabel.setText('{} more clicks'.format(str(3-threeClickVal[0])))
                 self.beamAvailLabel.setStyleSheet("background-color: yellow")
