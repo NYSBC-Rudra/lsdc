@@ -3945,8 +3945,22 @@ class ControlMain(QtWidgets.QMainWindow):
         else:
             comm_s = f'center_on_click({correctedC2C_x},{correctedC2C_y},{fov["x"]},{fov["y"]},source="screen",maglevel=0,viewangle={current_viewangle})'
         if not self.vidActionRasterExploreRadio.isChecked():
+<<<<<<< Updated upstream
             self.aux_send_to_server(comm_s)
 
+=======
+            self.aux_send_to_server(*comm_s)
+        if self.threeClickCount == 4:
+            #check if three click centering is done from MD2
+            task = self.md2.task_info.get()
+            task_name = task[0]
+            task_complete = (task[6] != 1)
+            if task_name == "Manual Centring" and task_complete:
+                self.threeClickCount = 1
+                return
+            self.threeClickCount = 0
+            self.click3Button.setStyleSheet("background-color: None")
+>>>>>>> Stashed changes
         return
 
     '''
