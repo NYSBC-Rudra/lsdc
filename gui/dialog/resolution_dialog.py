@@ -25,48 +25,48 @@ class CalculatorWindow(QtWidgets.QDialog):
 		super(CalculatorWindow, self).__init__(parent)
 		self.setFixedSize(WINDOW_SIZE,WINDOW_SIZE)
 		#making radio buttons to choose formula
-		self.buttonDictionary = {'L': {'picker' : QRadioButton('Caluclate crystal to detector distance')},
-			   'd': {'picker': QRadioButton("Calculate resolution")} , 
+		self.buttonDictionary = {'DetectorDistance': {'picker' : QRadioButton('Caluclate crystal to detector distance (mm)')},
+			   'Resolution': {'picker': QRadioButton("Calculate resolution Å")} , 
 			#    'theta': {'picker':QRadioButton("Calculate detector 2theta")},
-			   'wavelength': {'picker':QRadioButton("Calculate Energy")},
-			     'r':{'value':None}}
+			   'Energy': {'picker':QRadioButton("Calculate Energy eV")},
+			     'DetectorRadius':{'value':None}}
 		
 		#making lines to hold inputs 
 		# self.r_value_enter = QComboBox()
 		# self.r_value_enter.setToolTip("Choose your detector")
 		# detectorList = ['NYX-Beamline (200.0mm)?', 'Dectris EIGER2 X 9M (244.7mm)']
 		# self.r_value_enter.addItems(detectorList)
-		# self.buttonDictionary['r']['value'] = self.r_value_enter
+		# self.buttonDictionary['DetectorRadius']['value'] = self.r_value_enter
 		# self.r_value_enter.setCurrentIndex(1)
-		self.r_value_enter = QComboBox()
-		self.r_value_enter.addItems(['122.5mm (AMX & NYX)', '164mm (FMX)'])
-		self.r_value_enter.setPlaceholderText('Set detector radius')
-		self.buttonDictionary['r']['value'] = self.r_value_enter
+		self.detectorradius_value_enter = QComboBox()
+		self.detectorradius_value_enter.addItems(['244.7mm (AMX & NYX)', '164mm (FMX)'])
+		self.detectorradius_value_enter.setPlaceholderText('Set detector radius')
+		self.buttonDictionary['DetectorRadius']['value'] = self.detectorradius_value_enter
 		#self.r_value_enter.setValidator(QDoubleValidator())
 
 
 
 		#setting inputs to Double only
 
-		self.L_value_enter = QLineEdit()
-		self.L_value_enter.setPlaceholderText('Set crystal to detector distance')
-		self.buttonDictionary['L']['value'] = self.L_value_enter
-		self.L_value_enter.setValidator(QDoubleValidator())
+		self.detectordistance_value_enter = QLineEdit()
+		self.detectordistance_value_enter.setPlaceholderText('Set crystal to detector distance')
+		self.buttonDictionary['DetectorDistance']['value'] = self.detectordistance_value_enter
+		self.detectordistance_value_enter.setValidator(QDoubleValidator())
 
-		self.d_value_enter = QLineEdit()
-		self.d_value_enter.setPlaceholderText('Set resolution')
-		self.buttonDictionary['d']['value'] = self.d_value_enter
-		self.d_value_enter.setValidator(QDoubleValidator())
+		self.resolution_value_enter = QLineEdit()
+		self.resolution_value_enter.setPlaceholderText('Set resolution')
+		self.buttonDictionary['Resolution']['value'] = self.resolution_value_enter
+		self.resolution_value_enter.setValidator(QDoubleValidator())
 
 		#self.theta_value_enter = QLineEdit()
 		# self.theta_value_enter.setPlaceholderText('Set detector theta value')
 		# self.buttonDictionary['theta']['value'] = self.theta_value_enter
 		#self.theta_value_enter.setValidator(QDoubleValidator())
 
-		self.wave_value_enter = QLineEdit()
-		self.wave_value_enter.setPlaceholderText('Set energy value')
-		self.buttonDictionary['wavelength']['value'] = self.wave_value_enter
-		self.wave_value_enter.setValidator(QDoubleValidator())
+		self.energy_value_enter = QLineEdit()
+		self.energy_value_enter.setPlaceholderText('Set energy value')
+		self.buttonDictionary['Energy']['value'] = self.energy_value_enter
+		self.energy_value_enter.setValidator(QDoubleValidator())
 
 
 		self.final_button = QPushButton('Calculate', self)
@@ -82,7 +82,7 @@ class CalculatorWindow(QtWidgets.QDialog):
 
 
 		layout = QVBoxLayout()
-		layout.addWidget(self.r_value_enter)
+		layout.addWidget(self.detectorradius_value_enter)
 		for key in self.buttonDictionary:
 			if 'picker' in self.buttonDictionary[key].keys(): 
 				layout.addWidget(self.buttonDictionary[key]['picker'])
@@ -111,21 +111,22 @@ class CalculatorWindow(QtWidgets.QDialog):
 		checked_key = None
 		#checking which formula to use
 		for key in self.buttonDictionary:
-			if key != 'r' and self.buttonDictionary[key]['picker'].isChecked():
+			if key != 'DetectorRadius' and self.buttonDictionary[key]['picker'].isChecked():
 				checked_key = key
 		if checked_key == None:
 			self.bottom_text.setText("No calculation specified (press one of the radio buttons)")
 			return
 		
 
-		r_value = self.r_value_enter.currentText()
+
+		detectorradius_value = self.detectorradius_value_enter.currentText()
     	# checking if value is a number string or empty string
-		if r_value == "" or r_value[0].isalpha() == True:
+		if detectorradius_value == "" or detectorradius_value[0].isalpha() == True:
 			self.bottom_text.setText("formula to calculate {} requires r value".format(checked_key))
 			return
 
 
-		r_value = convertDetectorRadius(r_value)
+		detectorradius_value = convertDetectorRadius(detectorradius_value)
 
 
 
@@ -139,19 +140,19 @@ class CalculatorWindow(QtWidgets.QDialog):
 
 
 
-		d_value = self.d_value_enter.displayText()
+		resolution_value = self.resolution_value_enter.displayText()
 		#checking if value is string or none if not calculating that value (trying to use .isalpha but not when value is None)
-		if ((d_value == "" or d_value[0].isalpha() == True) and checked_key != 'd') :
-			self.bottom_text.setText("Formula to calculate {} requires d value".format(checked_key))
+		if ((resolution_value == "" or resolution_value[0].isalpha() == True) and checked_key != 'Resolution') :
+			self.bottom_text.setText("formula to calculate {} requires d value".format(checked_key))
 			return
 
-		l_value = self.L_value_enter.displayText()
-		if ((l_value == "" or l_value[0].isalpha() == True) and checked_key != 'L'):
-			self.bottom_text.setText("Formula to calculate {} requires L value.".format(checked_key))
+		detectordistance_value = self.detectordistance_value_enter.displayText()
+		if ((detectordistance_value == "" or detectordistance_value[0].isalpha() == True) and checked_key != "DetectorDistance"):
+			self.bottom_text.setText("formula to calculate {} requires L value".format(checked_key))
 			return
-		elif l_value != '' and checked_key != 'L':
-			if float(l_value) < 140 or float(l_value) > 350:
-				self.bottom_text.setText("Detector to crystal distance must be between 140 and 350mm.")	
+		elif detectordistance_value != '' and checked_key != "DetectorDistance":
+			if float(detectordistance_value) < 140 or float(detectordistance_value) > 350:
+				self.bottom_text.setText("detector to crystal distance must be between 140 and 350mm")	
 				return
 
 
@@ -162,56 +163,59 @@ class CalculatorWindow(QtWidgets.QDialog):
 			# self.bottom_text.setText("formula to calculate {} requires theta value".format(checked_key))
 		#	return
 
-		wave_value = self.wave_value_enter.displayText()
-		if ((wave_value == "" or wave_value[0].isalpha() == True) and checked_key != 'wavelength'):
-			self.bottom_text.setText("Formula to calculate {} requires the wavelength.".format(checked_key))
+		energy_value = self.energy_value_enter.displayText()
+		if ((energy_value == "" or energy_value[0].isalpha() == True) and checked_key != 'Energy'):
+			self.bottom_text.setText("formula to calculate {} requires the energy".format(checked_key))
 			return
 
 
 		#setting value to return if want value returned
 		value_to_return = None
 
-		if checked_key == 'd':
-			l_value = float(self.L_value_enter.displayText())
+		if checked_key == 'Resolution':
+			detectordistance_value = float(self.detectordistance_value_enter.displayText())
 			# theta_value = float(self.theta_value_enter.displayText())
-			wave_value = float(self.wave_value_enter.displayText())
+			energy_value = float(self.energy_value_enter.displayText())
 
 
 
 
 
-			variableDict = {'L':l_value, 
+			variableDict = {'DetectorDistance':detectordistance_value, 
 				   #'theta': theta_value, 
-				   'wavelength': wave_value, 'r': r_value}
+				   'Energy': energy_value, 'DetectorRadius': detectorradius_value}
+
 
 			self.calculator.set_all_variables(variableDict)
-			d_value = self.calculator.calcD()
-			value_to_return = d_value
-			self.d_value_enter.setText(str(d_value))
-			self.calculator.set_variables('d', d_value)
+			resolution_value = self.calculator.calcD()
+			value_to_return = resolution_value
+			self.resolution_value_enter.setText(str(resolution_value))
+			self.calculator.set_variables('Resolution', resolution_value)
 			checked_key = 'Resolution'
 
 
 
 
-		elif checked_key == 'L':
+		elif checked_key == "DetectorDistance":
 
-			d_value = float(self.d_value_enter.displayText())
+			resolution_value = float(self.resolution_value_enter.displayText())
 			# theta_value = float(self.theta_value_enter.displayText())
-			wave_value = float(self.wave_value_enter.displayText())
+			energy_value = float(self.energy_value_enter.displayText())
 
 
 
 
-			variableDict = {'d':d_value, 
+			variableDict = {'Resolution':resolution_value, 
 				   #'theta': theta_value, 
-				   'wavelength': wave_value, 'r': r_value}
+				   'Energy': energy_value, 'DetectorRadius': detectorradius_value}
 
+
+			
 			self.calculator.set_all_variables(variableDict)
-			L_value = self.calculator.calcL()
-			value_to_return = L_value
-			self.L_value_enter.setText(str(L_value))
-			self.calculator.set_variables('L', L_value)
+			calculated_DetectorDistance = self.calculator.calcL()
+			value_to_return = calculated_DetectorDistance
+			self.detectordistance_value_enter.setText(str(calculated_DetectorDistance))
+			self.calculator.set_variables('DetectorDistance', calculated_DetectorDistance)
 			#setting checked key name so that it will change the bottom text
 			checked_key = 'Detector distance (mm)'
 
@@ -222,7 +226,7 @@ class CalculatorWindow(QtWidgets.QDialog):
 		# 	wave_value = float(self.wave_value_enter.displayText())
 
 
-		# 	variableDict = {'L':l_value, 'd': d_value, 'wavelength': wave_value, 'r': r_value}
+		# 	variableDict = {'DetectorDistance':l_value, 'Resolution': d_value, 'Energy': wave_value, 'DetectorRadius': r_value}
 
 		# 	self.calculator.set_all_variables(variableDict)
 		# 	# theta_value = self.calculator.calcTheta()
@@ -232,20 +236,22 @@ class CalculatorWindow(QtWidgets.QDialog):
 			
 
 
-		elif checked_key == 'wavelength':
+		elif checked_key == 'Energy':
 
-			l_value = float(self.L_value_enter.displayText())
+			detectordistance_value = float(self.detectordistance_value_enter.displayText())
 			# theta_value = float(self.theta_value_enter.displayText())
-			d_value = float(self.d_value_enter.displayText())
-			variableDict = {'L':l_value, 'd': d_value, 
+			resolution_value = float(self.resolution_value_enter.displayText())
+			variableDict = {'DetectorDistance':detectordistance_value, 'Resolution': resolution_value, 
 				   #'theta': theta_value, 
-				   'r': r_value}
+				   'DetectorRadius': detectorradius_value}
 
+
+			
 			self.calculator.set_all_variables(variableDict)
-			wave_value = self.calculator.calcWavelength()
-			self.calculator.set_variables('wavelength', wave_value)
-			value_to_return = wave_value
-			self.wave_value_enter.setText(str(wave_value))
+			energy_value = self.calculator.calcenergy()
+			self.calculator.set_variables('Energy', energy_value)
+			value_to_return = energy_value
+			self.energy_value_enter.setText(str(energy_value))
 			checked_key = 'Energy'
 		
 
@@ -260,10 +266,10 @@ class CalculatorWindow(QtWidgets.QDialog):
 
 		
 def convertDetectorRadius(inputText):
+
 	number = inputText[:inputText.find('mm')]
+
 	return float(number)
-
-
 
 
 
